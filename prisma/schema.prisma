@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+  orders    Order[]
+}
+
+model DailyMenu {
+  id        Int        @id @default(autoincrement())
+  date      DateTime
+  mealType  String     // "lunch" or "dinner"
+  createdAt DateTime   @default(now())
+  items     MenuItem[]
+  orders    Order[]
+
+  @@unique([date, mealType])
+}
+
+model MenuItem {
+  id          Int        @id @default(autoincrement())
+  dailyMenuId Int
+  name        String
+  price       Float
+  description String?
+  createdAt   DateTime   @default(now())
+  dailyMenu   DailyMenu  @relation(fields: [dailyMenuId], references: [id])
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  dailyMenuId Int
+  createdAt   DateTime    @default(now())
+  user        User        @relation(fields: [userId], references: [id])
+  dailyMenu   DailyMenu   @relation(fields: [dailyMenuId], references: [id])
+  items       OrderItem[]
+
+  @@unique([userId, dailyMenuId])
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  menuItemId Int
+  quantity   Int      @default(1)
+  order      Order    @relation(fields: [orderId], references: [id])
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+}
