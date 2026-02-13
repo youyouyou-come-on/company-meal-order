@@ -30,6 +30,12 @@ export default function Navbar() {
               <span className="text-sm text-gray-400">加载中...</span>
             ) : user ? (
               <>
+                <Link
+                  href="/admin"
+                  className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  管理菜单
+                </Link>
                 <span className="text-sm text-gray-700">{user.name}</span>
                 <button
                   onClick={handleLogout}
