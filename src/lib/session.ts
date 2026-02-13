@@ -13,7 +13,7 @@ export const sessionOptions: SessionOptions = {
     "complex_password_at_least_32_characters_long_for_dev",
   cookieName: "meal-order-session",
   cookieOptions: {
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.COOKIE_SECURE === "true",
     httpOnly: true,
     sameSite: "lax" as const,
   },
