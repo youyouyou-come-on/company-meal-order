@@ -16,25 +16,21 @@ export async function POST(request: NextRequest) {
 
     const trimmedName = name.trim();
 
-    // Find or create user
     const user = await prisma.user.upsert({
       where: { name: trimmedName },
       update: {},
       create: { name: trimmedName },
     });
 
-    // Set session
     const session = await getSession();
     session.userId = user.id;
     session.userName = user.name;
-    session.userRole = user.role;
     await session.save();
 
     return NextResponse.json({
       user: {
         id: user.id,
         name: user.name,
-        role: user.role,
       },
     });
   } catch {
@@ -44,4 +40,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

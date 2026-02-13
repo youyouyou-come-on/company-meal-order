@@ -13,11 +13,9 @@ export async function GET() {
       user: {
         id: session.userId,
         name: session.userName,
-        role: session.userRole,
       },
     });
   } catch {
     return NextResponse.json({ user: null });
   }
 }
-
