@@ -265,6 +265,7 @@ function MenuManagement() {
         <MenuFormModal
           date={date}
           editMenu={editingMenu}
+          existingMealTypes={menus.map((m) => m.mealType)}
           onClose={() => { setShowCreate(false); setEditingMenu(null); }}
           onSaved={() => {
             setShowCreate(false);
@@ -283,16 +284,21 @@ function MenuManagement() {
 function MenuFormModal({
   date,
   editMenu,
+  existingMealTypes,
   onClose,
   onSaved,
 }: {
   date: string;
   editMenu: DailyMenu | null;
+  existingMealTypes: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const availableMealTypes = (["lunch", "dinner"] as const).filter(
+    (t) => !existingMealTypes.includes(t)
+  );
   const [mealType, setMealType] = useState<"lunch" | "dinner">(
-    (editMenu?.mealType as "lunch" | "dinner") || "lunch"
+    (editMenu?.mealType as "lunch" | "dinner") || availableMealTypes[0] || "lunch"
   );
   const [items, setItems] = useState<MenuItem[]>(
     editMenu
@@ -351,7 +357,11 @@ function MenuFormModal({
 
       if (!res.ok) {
         const d = await res.json();
-        setError(d.error || "操作失败");
+        if (res.status === 409) {
+          setError("该日期和餐次的菜单已存在，请关闭窗口后点击对应菜单的「编辑」按钮来添加菜品");
+        } else {
+          setError(d.error || "操作失败");
+        }
         return;
       }
 
@@ -373,14 +383,23 @@ function MenuFormModal({
         {!editMenu && (
           <div className="mb-4">
             <label className="mb-1 block text-sm font-medium text-gray-700">餐次</label>
-            <select
-              value={mealType}
-              onChange={(e) => setMealType(e.target.value as "lunch" | "dinner")}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
-            >
-              <option value="lunch">午餐</option>
-              <option value="dinner">晚餐</option>
-            </select>
+            {availableMealTypes.length === 0 ? (
+              <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                该日期的午餐和晚餐菜单均已创建，请关闭窗口后点击「编辑」按钮来修改菜品
+              </p>
+            ) : (
+              <select
+                value={mealType}
+                onChange={(e) => setMealType(e.target.value as "lunch" | "dinner")}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+              >
+                {availableMealTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {mealLabel(t)}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         )}
 
@@ -443,7 +462,7 @@ function MenuFormModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || (!editMenu && availableMealTypes.length === 0)}
             className="flex-1 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
           >
             {submitting ? "提交中..." : editMenu ? "保存修改" : "创建菜单"}

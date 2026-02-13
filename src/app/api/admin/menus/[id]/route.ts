@@ -36,7 +36,17 @@ export async function PUT(
       return NextResponse.json({ error: "菜单不存在" }, { status: 404 });
     }
 
-    // Simple replace strategy: delete old items, create new ones
+    // Simple replace strategy: delete old items (cascade OrderItems first), create new ones
+    const oldItems = await prisma.menuItem.findMany({
+      where: { dailyMenuId: menuId },
+      select: { id: true },
+    });
+    const oldItemIds = oldItems.map((item) => item.id);
+    if (oldItemIds.length > 0) {
+      await prisma.orderItem.deleteMany({
+        where: { menuItemId: { in: oldItemIds } },
+      });
+    }
     await prisma.menuItem.deleteMany({ where: { dailyMenuId: menuId } });
 
     const menu = await prisma.dailyMenu.update({
