@@ -8,10 +8,11 @@ datasource db {
 }
 
 model User {
-  id        Int          @id @default(autoincrement())
-  name      String       @unique
-  createdAt DateTime     @default(now())
-  signups   MealSignup[]
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  createdAt   DateTime         @default(now())
+  signups     MealSignup[]
+  suggestions DishSuggestion[]
 }
 
 model WeeklyMenu {
@@ -32,4 +33,12 @@ model MealSignup {
   user      User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, date, mealType])
+}
+
+model DishSuggestion {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }

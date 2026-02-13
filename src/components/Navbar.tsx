@@ -23,6 +23,12 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-4">
+            <Link
+              href="/suggestions"
+              className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            >
+              想吃什么
+            </Link>
             {loading ? (
               <span className="text-sm text-gray-400">加载中...</span>
             ) : user ? (
