@@ -30,6 +30,9 @@ export async function GET(request: NextRequest) {
     if (!session.userId) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
+    if (!session.adminVerified) {
+      return NextResponse.json({ error: "未验证管理员密码" }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const weekStart = searchParams.get("weekStart") || getMondayOfCurrentWeek();
@@ -60,6 +63,9 @@ export async function POST(request: NextRequest) {
     const session = await getSession();
     if (!session.userId) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
+    if (!session.adminVerified) {
+      return NextResponse.json({ error: "未验证管理员密码" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -103,6 +109,9 @@ export async function DELETE(request: NextRequest) {
     const session = await getSession();
     if (!session.userId) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
+    if (!session.adminVerified) {
+      return NextResponse.json({ error: "未验证管理员密码" }, { status: 403 });
     }
 
     const body = await request.json();

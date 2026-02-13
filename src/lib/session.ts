@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 export interface SessionData {
   userId: number;
   userName: string;
+  adminVerified?: boolean;
 }
 
 export const sessionOptions: SessionOptions = {

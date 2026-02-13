@@ -53,6 +53,12 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [copyLoading, setCopyLoading] = useState(false);
 
+  // Admin password verification state
+  const [adminVerified, setAdminVerified] = useState(false);
+  const [password, setPassword] = useState("");
+  const [verifyError, setVerifyError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
   const monday = getMondayDate(weekOffset);
   const weekDates = getWeekDates(monday);
   const sundayDate = weekDates[6];
@@ -71,15 +77,51 @@ export default function AdminPage() {
     }
   }, [weekOffset]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Check admin verification status on load
+  useEffect(() => {
+    if (user) {
+      fetch("/api/admin/verify")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.verified) {
+            setAdminVerified(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!userLoading && !user) {
       router.push("/login");
       return;
     }
-    if (user) {
+    if (user && adminVerified) {
       fetchMenus();
     }
-  }, [user, userLoading, router, fetchMenus]);
+  }, [user, userLoading, router, fetchMenus, adminVerified]);
+
+  const handleVerifyPassword = async () => {
+    setVerifying(true);
+    setVerifyError("");
+    try {
+      const res = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminVerified(true);
+      } else {
+        setVerifyError(data.error || "验证失败");
+      }
+    } catch {
+      setVerifyError("验证失败");
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const getMenu = (date: string, mealType: string) =>
     menus.find((m) => m.date === date && m.mealType === mealType);
@@ -170,6 +212,40 @@ export default function AdminPage() {
   }
 
   if (!user) return null;
+
+  if (!adminVerified) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-orange-50/30">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-lg border border-orange-100">
+          <h2 className="mb-6 text-center text-xl font-bold text-gray-800">
+            🔒 管理员验证
+          </h2>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && password && !verifying) {
+                handleVerifyPassword();
+              }
+            }}
+            placeholder="请输入管理员密码"
+            className="mb-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-700 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          {verifyError && (
+            <p className="mb-4 text-center text-sm text-red-500">{verifyError}</p>
+          )}
+          <button
+            onClick={handleVerifyPassword}
+            disabled={verifying || !password}
+            className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-medium text-white shadow-md hover:bg-amber-600 disabled:opacity-50 transition-colors"
+          >
+            {verifying ? "验证中..." : "确认"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-orange-50/30">
