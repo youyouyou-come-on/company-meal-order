@@ -16,11 +16,16 @@ export async function POST(request: NextRequest) {
 
     const trimmedName = name.trim();
 
-    const user = await prisma.user.upsert({
+    const user = await prisma.user.findUnique({
       where: { name: trimmedName },
-      update: {},
-      create: { name: trimmedName },
     });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "用户不存在，请从列表中选择" },
+        { status: 400 }
+      );
+    }
 
     const session = await getSession();
     session.userId = user.id;

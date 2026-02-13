@@ -1,20 +1,42 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
+interface UserOption {
+  id: number;
+  name: string;
+}
+
 export default function LoginPage() {
-  const [name, setName] = useState("");
+  const [users, setUsers] = useState<UserOption[]>([]);
+  const [selectedName, setSelectedName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    async function fetchUsers() {
+      try {
+        const res = await fetch("/api/auth/users");
+        const data = await res.json();
+        setUsers(data.users ?? []);
+      } catch {
+        setError("获取用户列表失败");
+      } finally {
+        setLoadingUsers(false);
+      }
+    }
+    fetchUsers();
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
 
-    if (!name.trim()) {
-      setError("请输入姓名");
+    if (!selectedName) {
+      setError("请选择姓名");
       return;
     }
 
@@ -23,7 +45,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: selectedName }),
       });
 
       const data = await res.json();
@@ -54,24 +76,31 @@ export default function LoginPage() {
               htmlFor="name"
               className="mb-1 block text-sm font-medium text-gray-700"
             >
-              姓名
+              选择姓名
             </label>
-            <input
+            <select
               id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="请输入您的姓名"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              autoFocus
-            />
+              value={selectedName}
+              onChange={(e) => setSelectedName(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              disabled={loadingUsers}
+            >
+              <option value="">
+                {loadingUsers ? "加载中..." : "请选择"}
+              </option>
+              {users.map((user) => (
+                <option key={user.id} value={user.name}>
+                  {user.name}
+                </option>
+              ))}
+            </select>
           </div>
           {error && (
             <p className="text-sm text-red-600">{error}</p>
           )}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || loadingUsers || !selectedName}
             className="w-full rounded-md bg-blue-600 px-4 py-2 text-white font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "登录中..." : "开始点餐"}
