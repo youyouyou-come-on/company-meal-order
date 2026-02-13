@@ -132,9 +132,27 @@ export default function Home() {
   const isUserSignedUp = (signups: Signup[]) =>
     user ? signups.some((s) => s.userName === user.name) : false;
 
+  const chinaHour = (new Date().getUTCHours() + 8) % 24;
+  let greeting = '';
+  if (chinaHour < 11) greeting = '早上好 ☀️';
+  else if (chinaHour < 14) greeting = '中午好 🌤️';
+  else if (chinaHour < 18) greeting = '下午好 🌅';
+  else greeting = '晚上好 🌙';
+
   return (
     <div className="min-h-screen bg-orange-50/30">
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+        {/* Welcome area */}
+        <div className="mb-6 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-400 p-5 text-white shadow-md">
+          <div className="text-2xl font-bold">
+            {user ? `${greeting}，${user.name}！` : `${greeting}，欢迎来到公司食堂 🍽️`}
+          </div>
+          {user && (
+            <p className="mt-1 text-amber-50 text-sm">今天想吃点什么？</p>
+          )}
+          <div className="mt-2 text-lg opacity-80">🍚 🥗 🍜 🥘 🍲</div>
+        </div>
+
         {/* Date tabs */}
         <div className="mb-6 overflow-x-auto">
           <div className="flex gap-2 min-w-max pb-2">
@@ -159,8 +177,10 @@ export default function Home() {
                 >
                   <span className="text-xs">{dayLabel}</span>
                   <span className="text-base font-bold">{shortDate}</span>
-                  {isToday && !isSelected && (
-                    <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  {isToday && (
+                    <span className={`text-[10px] font-bold mt-0.5 ${isSelected ? 'text-amber-100' : 'text-amber-500'}`}>
+                      今天
+                    </span>
                   )}
                 </button>
               );
@@ -169,6 +189,9 @@ export default function Home() {
         </div>
 
         {/* Meal cards */}
+        {selectedDate === today && (
+          <h2 className="mb-4 text-xl font-bold text-gray-800">📢 今日菜单</h2>
+        )}
         <div className="space-y-4">
           <MealCard
             emoji="🍱"
@@ -200,6 +223,10 @@ export default function Home() {
             onCancel={() => handleCancel("dinner")}
             onLogin={() => router.push("/login")}
           />
+        </div>
+
+        <div className="mt-8 text-center text-sm text-gray-400 pb-4">
+          好好吃饭，认真工作 💪
         </div>
       </main>
     </div>
@@ -251,9 +278,13 @@ function MealCard({
 
       {/* Menu content */}
       {menu ? (
-        <p className="mb-4 rounded-xl bg-orange-50 p-3 text-sm leading-relaxed text-gray-700">
-          {menu.dishes}
-        </p>
+        <div className="mb-4 rounded-xl bg-orange-50 p-3 flex flex-wrap gap-1">
+          {menu.dishes.split(/[、，,]/).filter(Boolean).map((dish, i) => (
+            <span key={i} className="inline-block rounded-full bg-amber-50 px-3 py-1 text-sm text-amber-800 border border-amber-200">
+              {dish.trim()}
+            </span>
+          ))}
+        </div>
       ) : (
         <p className="mb-4 rounded-xl bg-gray-50 p-3 text-sm text-gray-400">
           暂无菜单
@@ -304,14 +335,23 @@ function MealCard({
 
       {/* Signup list */}
       <div className="rounded-xl bg-gray-50 p-3">
-        <p className="text-sm font-medium text-gray-600">
+        <p className="text-sm font-medium text-gray-600 mb-2">
           👥 已报名 ({signups.length}人)
-          {signups.length > 0 && (
-            <span className="font-normal text-gray-500">
-              ：{signups.map((s) => s.userName).join("、")}
-            </span>
-          )}
         </p>
+        {signups.length > 0 ? (
+          <div className="flex flex-wrap gap-3">
+            {signups.map((s) => (
+              <div key={s.id} className="flex flex-col items-center">
+                <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center text-sm font-bold text-amber-700">
+                  {s.userName.charAt(0)}
+                </div>
+                <span className="text-xs text-gray-500 mt-1">{s.userName}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">还没有人报名哦~</p>
+        )}
       </div>
     </div>
   );
