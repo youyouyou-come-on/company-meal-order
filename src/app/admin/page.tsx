@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
@@ -59,10 +59,27 @@ export default function AdminPage() {
   const [verifyError, setVerifyError] = useState("");
   const [verifying, setVerifying] = useState(false);
 
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   const monday = getMondayDate(weekOffset);
   const weekDates = getWeekDates(monday);
   const sundayDate = weekDates[6];
   const weekLabel = `${weekDates[0]} ~ ${sundayDate}`;
+
+  function handleDatePick(dateStr: string) {
+    const picked = new Date(`${dateStr}T00:00:00.000Z`);
+    const pickedDay = picked.getUTCDay();
+    const diffToMonday = pickedDay === 0 ? -6 : 1 - pickedDay;
+    const pickedMonday = new Date(Date.UTC(picked.getUTCFullYear(), picked.getUTCMonth(), picked.getUTCDate() + diffToMonday));
+
+    const now = new Date();
+    const nowDay = now.getUTCDay();
+    const nowDiffToMonday = nowDay === 0 ? -6 : 1 - nowDay;
+    const currentMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + nowDiffToMonday));
+
+    const diffWeeks = Math.round((pickedMonday.getTime() - currentMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    setWeekOffset(diffWeeks);
+  }
 
   const fetchMenus = useCallback(async () => {
     setLoading(true);
@@ -251,20 +268,52 @@ export default function AdminPage() {
     <div className="min-h-screen bg-orange-50/30">
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
         {/* Week selector */}
-        <div className="mb-6 flex items-center justify-between rounded-2xl bg-white p-4 shadow-md border border-orange-100">
-          <button
-            onClick={() => setWeekOffset((o) => o - 1)}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
-          >
-            ← 上一周
-          </button>
-          <span className="text-sm font-semibold text-gray-700">{weekLabel}</span>
-          <button
-            onClick={() => setWeekOffset((o) => o + 1)}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
-          >
-            下一周 →
-          </button>
+        <div className="mb-6 rounded-2xl bg-white p-4 shadow-md border border-orange-100">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setWeekOffset((o) => o - 1)}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+            >
+              ← 上一周
+            </button>
+            <span className="flex items-center gap-1 text-sm font-semibold text-gray-700">
+              {weekLabel}
+              <button
+                onClick={() => dateInputRef.current?.showPicker()}
+                className="ml-1 rounded-md p-1 text-base hover:bg-amber-50 transition-colors"
+                title="选择日期"
+              >
+                📅
+              </button>
+              <input
+                ref={dateInputRef}
+                type="date"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleDatePick(e.target.value);
+                    e.target.value = "";
+                  }
+                }}
+              />
+            </span>
+            <button
+              onClick={() => setWeekOffset((o) => o + 1)}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+            >
+              下一周 →
+            </button>
+          </div>
+          {weekOffset !== 0 && (
+            <div className="mt-2 flex justify-center">
+              <button
+                onClick={() => setWeekOffset(0)}
+                className="rounded-lg px-3 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+              >
+                回到本周
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Copy last week button */}
