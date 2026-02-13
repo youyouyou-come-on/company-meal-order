@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🍽️ 公司点餐系统
 
-## Getting Started
+公司内部员工点餐系统，支持查看每周菜单、报名吃饭、提交菜品建议。适合 20 人左右的小团队使用。
 
-First, run the development server:
+## ✨ 功能特性
+
+- 📋 每周菜单展示（午餐/晚餐，按天切换）
+- ✅ 一键报名"吃"或取消
+- 👥 实时显示已报名人员和人数
+- ⏰ 自动截止（午餐 10:00 前，晚餐 15:00 前）
+- 🍽️ 菜品建议单（提交下周想吃什么）
+- 🔧 管理后台（密码保护，菜单增删改，复制上周菜单）
+- 📱 移动端友好（大按钮，响应式）
+- 🔑 简易登录（下拉选择姓名，无需密码）
+
+## 🛠️ 技术栈
+
+| 技术 | 版本 |
+|------|------|
+| Next.js | 16 (App Router) |
+| TypeScript | 5 |
+| Tailwind CSS | v4 |
+| Prisma ORM | 7 |
+| SQLite | - |
+| iron-session | 8 |
+| pnpm | - |
+
+## 🚀 快速开始
+
+### 前置条件
+
+- Node.js 18+
+- pnpm
+
+### 本地开发
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+git clone -b 公司内部点餐系统 https://github.com/zkf4581/company-meal-order.git
+cd company-meal-order
+pnpm install
+cp .env.example .env  # Windows: copy .env.example .env
+# 编辑 .env 配置密码
+
+npx prisma generate
+npx prisma db push
+npx prisma db seed
+
 pnpm dev
-# or
-bun dev
+# 打开 http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 生产部署
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm build
+pnpm start
+# 或指定端口: PORT=8080 pnpm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## ⚙️ 环境变量
 
-## Learn More
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `DATABASE_URL` | SQLite 数据库路径 | `file:./prod.db` |
+| `SESSION_PASSWORD` | Session 加密密钥（≥32 字符） | 无，必须设置 |
+| `ADMIN_PASSWORD` | 管理后台密码 | `123456` |
+| `COOKIE_SECURE` | HTTPS 时设为 `true` | `false` |
 
-To learn more about Next.js, take a look at the following resources:
+## 👥 员工管理
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**方式一：Prisma Studio（推荐）**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npx prisma studio
+# 打开 http://localhost:5555，在 User 表中添加/修改/删除员工
+```
 
-## Deploy on Vercel
+**方式二：修改种子数据**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+编辑 `prisma/seed.ts`，修改姓名列表后执行 `npx prisma db seed`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📁 项目结构
+
+```
+├── prisma/
+│   ├── schema.prisma    # 数据库模型
+│   └── seed.ts          # 种子数据（用户 + 示例菜单）
+├── src/
+│   ├── app/
+│   │   ├── page.tsx         # 首页（菜单 + 报名）
+│   │   ├── login/           # 登录页
+│   │   ├── admin/           # 管理后台
+│   │   ├── suggestions/     # 菜品建议单
+│   │   └── api/             # API 路由
+│   ├── components/
+│   │   └── Navbar.tsx       # 导航栏
+│   ├── hooks/
+│   │   └── useCurrentUser.ts
+│   └── lib/
+│       ├── prisma.ts        # 数据库连接
+│       └── session.ts       # Session 配置
+├── .env.example             # 环境变量模板
+└── package.json
+```
+
+## 📄 License
+
+MIT
