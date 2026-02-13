@@ -18,7 +18,7 @@ export async function PUT(
 
     const body = await request.json();
     const { items } = body as {
-      items: { id?: number; name: string; price: number; description?: string }[];
+      items: { id?: number; name: string; price?: number; description?: string }[];
     };
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -55,7 +55,7 @@ export async function PUT(
         items: {
           create: items.map((item) => ({
             name: item.name,
-            price: item.price,
+            price: item.price ?? 0,
             description: item.description || null,
           })),
         },

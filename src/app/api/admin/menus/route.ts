@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const { date, mealType, items } = body as {
       date: string;
       mealType: "lunch" | "dinner";
-      items: { name: string; price: number; description?: string }[];
+      items: { name: string; price?: number; description?: string }[];
     };
 
     if (!date || !mealType || !Array.isArray(items) || items.length === 0) {
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
         items: {
           create: items.map((item) => ({
             name: item.name,
-            price: item.price,
+            price: item.price ?? 0,
             description: item.description || null,
           })),
         },

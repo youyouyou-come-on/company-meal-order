@@ -7,7 +7,6 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 interface MenuItem {
   id: number;
   name: string;
-  price: number;
   description: string | null;
 }
 
@@ -48,7 +47,6 @@ export default function OrderPage() {
   const [menuData, setMenuData] = useState<MenuResponse | null>(null);
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -79,34 +77,34 @@ export default function OrderPage() {
     }
   }, [user, userLoading, router, fetchData]);
 
-  function updateQuantity(itemId: number, delta: number) {
-    setQuantities((prev) => {
-      const current = prev[itemId] || 0;
-      const next = Math.max(0, current + delta);
-      return { ...prev, [itemId]: next };
-    });
-  }
-
-  async function handleSubmitOrder(meal: MealData) {
-    const selectedItems = meal.items
-      .filter((item) => (quantities[item.id] || 0) > 0)
-      .map((item) => ({ menuItemId: item.id, quantity: quantities[item.id] }));
-
-    if (selectedItems.length === 0) {
-      setMessage({ type: "error", text: "请至少选择一道菜品" });
-      return;
-    }
-
+  async function handleConfirmMeal(meal: MealData) {
     setSubmitting(meal.menu.mealType);
     setMessage(null);
 
     try {
+      // Refetch latest menu to get current menuItemIds (avoids stale ID issues)
+      const menuRes = await fetch("/api/menus/today");
+      const latestMenus = await menuRes.json();
+      const latestMeal = latestMenus[meal.menu.mealType as "lunch" | "dinner"] as MealData | null;
+
+      if (!latestMeal || latestMeal.items.length === 0) {
+        setMessage({ type: "error", text: "菜单已变更，请刷新页面" });
+        await fetchData();
+        return;
+      }
+
+      // Order all items, each with quantity 1
+      const items = latestMeal.items.map((item) => ({
+        menuItemId: item.id,
+        quantity: 1,
+      }));
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          dailyMenuId: meal.menu.id,
-          items: selectedItems,
+          dailyMenuId: latestMeal.menu.id,
+          items,
         }),
       });
 
@@ -118,7 +116,6 @@ export default function OrderPage() {
       }
 
       setMessage({ type: "success", text: "下单成功！" });
-      setQuantities({});
       await fetchData();
     } catch {
       setMessage({ type: "error", text: "网络错误，请重试" });
@@ -153,13 +150,6 @@ export default function OrderPage() {
 
   function getOrderForMeal(mealType: string): Order | undefined {
     return myOrders.find((o) => o.dailyMenu.mealType === mealType);
-  }
-
-  function calcTotal(meal: MealData): number {
-    return meal.items.reduce(
-      (sum, item) => sum + item.price * (quantities[item.id] || 0),
-      0
-    );
   }
 
   if (userLoading || loading) {
@@ -240,7 +230,7 @@ export default function OrderPage() {
                 </div>
 
                 {existingOrder ? (
-                  <OrderDetail
+                  <OrderConfirmed
                     order={existingOrder}
                     isClosed={isClosed}
                     submitting={submitting}
@@ -249,13 +239,10 @@ export default function OrderPage() {
                 ) : isClosed ? (
                   <p className="text-gray-400 text-sm">点餐已截止，未下单</p>
                 ) : (
-                  <MenuItemList
+                  <MealConfirm
                     meal={meal}
-                    quantities={quantities}
-                    total={calcTotal(meal)}
                     submitting={submitting}
-                    onUpdateQuantity={updateQuantity}
-                    onSubmit={() => handleSubmitOrder(meal)}
+                    onConfirm={() => handleConfirmMeal(meal)}
                   />
                 )}
               </div>
@@ -269,7 +256,7 @@ export default function OrderPage() {
 
 /* ---- Sub-components ---- */
 
-function OrderDetail({
+function OrderConfirmed({
   order,
   isClosed,
   submitting,
@@ -280,31 +267,19 @@ function OrderDetail({
   submitting: string | null;
   onCancel: (id: number) => void;
 }) {
-  const total = order.items.reduce(
-    (sum, item) => sum + item.menuItem.price * item.quantity,
-    0
-  );
-
   return (
     <div className="space-y-3">
       <div className="rounded-xl bg-orange-50 p-4">
         <p className="text-sm font-medium text-orange-700 mb-2">✅ 已下单</p>
-        {order.items.map((item) => (
-          <div
-            key={item.id}
-            className="flex justify-between text-sm text-gray-700 py-1"
-          >
-            <span>
-              {item.menuItem.name} × {item.quantity}
+        <div className="flex flex-wrap gap-2">
+          {order.items.map((item) => (
+            <span
+              key={item.id}
+              className="inline-block rounded-lg bg-white px-3 py-1.5 text-sm text-gray-700 border border-orange-200"
+            >
+              {item.menuItem.name}
             </span>
-            <span className="text-orange-600 font-medium">
-              ¥{(item.menuItem.price * item.quantity).toFixed(1)}
-            </span>
-          </div>
-        ))}
-        <div className="mt-2 pt-2 border-t border-orange-200 flex justify-between text-sm font-semibold">
-          <span>合计</span>
-          <span className="text-orange-700">¥{total.toFixed(1)}</span>
+          ))}
         </div>
       </div>
       {!isClosed && (
@@ -320,80 +295,37 @@ function OrderDetail({
   );
 }
 
-function MenuItemList({
+function MealConfirm({
   meal,
-  quantities,
-  total,
   submitting,
-  onUpdateQuantity,
-  onSubmit,
+  onConfirm,
 }: {
   meal: MealData;
-  quantities: Record<number, number>;
-  total: number;
   submitting: string | null;
-  onUpdateQuantity: (id: number, delta: number) => void;
-  onSubmit: () => void;
+  onConfirm: () => void;
 }) {
-  const hasSelection = meal.items.some((item) => (quantities[item.id] || 0) > 0);
-
   return (
     <div className="space-y-3">
-      {meal.items.map((item) => {
-        const qty = quantities[item.id] || 0;
-        return (
+      <div className="flex flex-wrap gap-2">
+        {meal.items.map((item) => (
           <div
             key={item.id}
-            className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3"
+            className="rounded-xl bg-gray-50 px-4 py-2.5"
           >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2">
-                <span className="font-medium text-gray-800">{item.name}</span>
-                <span className="text-sm text-orange-600 font-medium">
-                  ¥{item.price.toFixed(1)}
-                </span>
-              </div>
-              {item.description && (
-                <p className="text-xs text-gray-400 mt-0.5 truncate">
-                  {item.description}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 ml-4">
-              <button
-                onClick={() => onUpdateQuantity(item.id, -1)}
-                disabled={qty === 0}
-                className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-              >
-                −
-              </button>
-              <span className="w-6 text-center text-sm font-medium text-gray-800">
-                {qty}
-              </span>
-              <button
-                onClick={() => onUpdateQuantity(item.id, 1)}
-                className="w-8 h-8 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center text-orange-600 hover:bg-orange-100 transition-colors"
-              >
-                +
-              </button>
-            </div>
+            <span className="font-medium text-gray-800">{item.name}</span>
+            {item.description && (
+              <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>
+            )}
           </div>
-        );
-      })}
-
-      {hasSelection && (
-        <div className="flex justify-between items-center pt-2 text-sm font-semibold text-gray-700">
-          <span>合计</span>
-          <span className="text-orange-700">¥{total.toFixed(1)}</span>
-        </div>
-      )}
+        ))}
+      </div>
 
       <button
-        onClick={onSubmit}
-        disabled={!hasSelection || submitting === meal.menu.mealType}
+        onClick={onConfirm}
+        disabled={submitting === meal.menu.mealType}
         className="w-full rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50 disabled:hover:bg-orange-500 transition-colors"
       >
-        {submitting === meal.menu.mealType ? "提交中..." : "提交订单"}
+        {submitting === meal.menu.mealType ? "提交中..." : "确认用餐"}
       </button>
     </div>
   );

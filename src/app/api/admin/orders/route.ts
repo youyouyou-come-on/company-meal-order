@@ -47,13 +47,12 @@ export async function GET(request: NextRequest) {
     // Aggregate: per-item totals
     const itemMap = new Map<
       number,
-      { name: string; price: number; totalQuantity: number }
+      { name: string; totalQuantity: number }
     >();
 
     for (const item of dailyMenu.items) {
       itemMap.set(item.id, {
         name: item.name,
-        price: item.price,
         totalQuantity: 0,
       });
     }
@@ -68,12 +67,10 @@ export async function GET(request: NextRequest) {
     }
 
     const itemSummary = Array.from(itemMap.entries()).map(
-      ([id, { name, price, totalQuantity }]) => ({
+      ([id, { name, totalQuantity }]) => ({
         menuItemId: id,
         name,
-        price,
         totalQuantity,
-        subtotal: price * totalQuantity,
       })
     );
 
@@ -83,13 +80,8 @@ export async function GET(request: NextRequest) {
       userName: order.user.name,
       items: order.items.map((oi) => ({
         name: oi.menuItem.name,
-        price: oi.menuItem.price,
         quantity: oi.quantity,
       })),
-      total: order.items.reduce(
-        (sum, oi) => sum + oi.menuItem.price * oi.quantity,
-        0
-      ),
     }));
 
     const totalOrders = dailyMenu.orders.length;

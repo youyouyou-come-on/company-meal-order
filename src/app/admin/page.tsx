@@ -9,7 +9,6 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 interface MenuItem {
   id?: number;
   name: string;
-  price: number;
   description?: string | null;
 }
 
@@ -24,16 +23,13 @@ interface DailyMenu {
 interface ItemSummary {
   menuItemId: number;
   name: string;
-  price: number;
   totalQuantity: number;
-  subtotal: number;
 }
 
 interface UserOrder {
   orderId: number;
   userName: string;
-  items: { name: string; price: number; quantity: number }[];
-  total: number;
+  items: { name: string; quantity: number }[];
 }
 
 interface OrderSummary {
@@ -251,7 +247,6 @@ function MenuManagement() {
                     className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"
                   >
                     <span className="text-gray-700">{item.name}</span>
-                    <span className="font-medium text-orange-600">¥{item.price}</span>
                   </div>
                 ))}
               </div>
@@ -302,8 +297,8 @@ function MenuFormModal({
   );
   const [items, setItems] = useState<MenuItem[]>(
     editMenu
-      ? editMenu.items.map((i) => ({ name: i.name, price: i.price, description: i.description || "" }))
-      : [{ name: "", price: 0, description: "" }]
+      ? editMenu.items.map((i) => ({ name: i.name, description: i.description || "" }))
+      : [{ name: "", description: "" }]
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -315,7 +310,7 @@ function MenuFormModal({
   }
 
   function addItem() {
-    setItems((prev) => [...prev, { name: "", price: 0, description: "" }]);
+    setItems((prev) => [...prev, { name: "", description: "" }]);
   }
 
   function removeItem(idx: number) {
@@ -336,7 +331,6 @@ function MenuFormModal({
     try {
       const payload = validItems.map((i) => ({
         name: i.name.trim(),
-        price: Number(i.price),
         description: i.description?.trim() || undefined,
       }));
 
@@ -415,22 +409,13 @@ function MenuFormModal({
                   onChange={(e) => updateItem(idx, "name", e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
                 />
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    placeholder="价格"
-                    value={item.price || ""}
-                    onChange={(e) => updateItem(idx, "price", parseFloat(e.target.value) || 0)}
-                    className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
-                  />
-                  <input
-                    type="text"
-                    placeholder="描述（可选）"
-                    value={item.description || ""}
-                    onChange={(e) => updateItem(idx, "description", e.target.value)}
-                    className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
-                  />
-                </div>
+                <input
+                  type="text"
+                  placeholder="描述（可选）"
+                  value={item.description || ""}
+                  onChange={(e) => updateItem(idx, "description", e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                />
               </div>
               <button
                 onClick={() => removeItem(idx)}
@@ -498,8 +483,6 @@ function OrderSummaryTab() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const grandTotal = data?.itemSummary.reduce((s, i) => s + i.subtotal, 0) ?? 0;
-
   return (
     <div>
       {/* Controls */}
@@ -538,10 +521,6 @@ function OrderSummaryTab() {
               <p className="text-2xl font-bold text-blue-600">{data.totalItems}</p>
               <p className="text-sm text-gray-500">份菜品</p>
             </div>
-            <div className="flex-1 rounded-xl bg-green-50 p-4 text-center">
-              <p className="text-2xl font-bold text-green-600">¥{grandTotal.toFixed(0)}</p>
-              <p className="text-sm text-gray-500">总金额</p>
-            </div>
           </div>
 
           {/* Item summary table */}
@@ -553,26 +532,21 @@ function OrderSummaryTab() {
               <thead>
                 <tr className="border-b border-gray-100 text-left text-gray-500">
                   <th className="px-4 py-2 font-medium">菜名</th>
-                  <th className="px-4 py-2 font-medium text-center">数量</th>
-                  <th className="px-4 py-2 font-medium text-right">小计</th>
+                  <th className="px-4 py-2 font-medium text-right">点餐人数</th>
                 </tr>
               </thead>
               <tbody>
                 {data.itemSummary.map((item) => (
                   <tr key={item.menuItemId} className="border-b border-gray-50">
                     <td className="px-4 py-2 text-gray-700">{item.name}</td>
-                    <td className="px-4 py-2 text-center text-gray-600">{item.totalQuantity}</td>
-                    <td className="px-4 py-2 text-right font-medium text-orange-600">
-                      ¥{item.subtotal.toFixed(0)}
-                    </td>
+                    <td className="px-4 py-2 text-right text-gray-600">{item.totalQuantity}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-semibold">
                   <td className="px-4 py-2 text-gray-700">合计</td>
-                  <td className="px-4 py-2 text-center text-gray-600">{data.totalItems}</td>
-                  <td className="px-4 py-2 text-right text-orange-700">¥{grandTotal.toFixed(0)}</td>
+                  <td className="px-4 py-2 text-right text-gray-600">{data.totalItems}</td>
                 </tr>
               </tfoot>
             </table>
@@ -591,7 +565,6 @@ function OrderSummaryTab() {
                   <tr className="border-b border-gray-100 text-left text-gray-500">
                     <th className="px-4 py-2 font-medium">姓名</th>
                     <th className="px-4 py-2 font-medium">点的菜品</th>
-                    <th className="px-4 py-2 font-medium text-right">金额</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -599,10 +572,7 @@ function OrderSummaryTab() {
                     <tr key={uo.orderId} className="border-b border-gray-50">
                       <td className="px-4 py-2 font-medium text-gray-700">{uo.userName}</td>
                       <td className="px-4 py-2 text-gray-600">
-                        {uo.items.map((i) => `${i.name}×${i.quantity}`).join("、")}
-                      </td>
-                      <td className="px-4 py-2 text-right font-medium text-orange-600">
-                        ¥{uo.total.toFixed(0)}
+                        {uo.items.map((i) => i.name).join("、")}
                       </td>
                     </tr>
                   ))}
