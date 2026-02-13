@@ -152,7 +152,7 @@ export default function OrderPage() {
     return myOrders.find((o) => o.dailyMenu.mealType === mealType);
   }
 
-  if (userLoading || loading) {
+  if (userLoading) {
     return (
       <div className="min-h-screen bg-orange-50/30 flex items-center justify-center">
         <p className="text-gray-500">加载中...</p>
@@ -161,6 +161,14 @@ export default function OrderPage() {
   }
 
   if (!user) return null;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-orange-50/30 flex items-center justify-center">
+        <p className="text-gray-500">加载中...</p>
+      </div>
+    );
+  }
 
   const meals: { key: "lunch" | "dinner"; emoji: string; title: string; deadline: string }[] = [
     { key: "lunch", emoji: "🍱", title: "午餐", deadline: "10:00" },
