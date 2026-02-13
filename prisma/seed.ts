@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { PrismaClient } from "../src/generated/prisma/client.js";
+import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
 const adapter = new PrismaBetterSqlite3({
@@ -19,7 +19,7 @@ async function main() {
 
   const menus: { date: string; lunch: string; dinner: string }[] = [
     { date: "2026-02-09", lunch: "红烧肉、清炒时蔬、番茄蛋汤", dinner: "宫保鸡丁、蒜蓉西兰花、紫菜蛋花汤" },
-    { date: "2026-02-10", lunch: "糖醋里脊、炒青菜、冬瓜排骨汤", dinner: "鱼香肉丝、爝炒土豆丝、豆腐汤" },
+    { date: "2026-02-10", lunch: "糖醋里脊、炒青菜、冬瓜排骨汤", dinner: "鱼香肉丝、炝炒土豆丝、豆腐汤" },
     { date: "2026-02-11", lunch: "回锅肉、干煸四季豆、酸辣汤", dinner: "红烧鱼块、清炒豆芽、玉米排骨汤" },
     { date: "2026-02-12", lunch: "麻婆豆腐、蒜薹炒肉、西红柿蛋汤", dinner: "辣子鸡、凉拌黄瓜、紫菜虾皮汤" },
     { date: "2026-02-13", lunch: "黄焖鸡、素炒三丁、萝卜牛腩汤", dinner: "水煮肉片、蒜蓉菠菜、银耳莲子羹" },
