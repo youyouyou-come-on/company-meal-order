@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 export interface SessionData {
   userId: number;
   userName: string;
+  userRole: string;
 }
 
 export const sessionOptions: SessionOptions = {
@@ -26,3 +27,4 @@ export async function getSession() {
   );
   return session;
 }
+

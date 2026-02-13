@@ -30,6 +30,14 @@ export default function Navbar() {
               <span className="text-sm text-gray-400">加载中...</span>
             ) : user ? (
               <>
+                {user.role === "admin" && (
+                  <Link
+                    href="/admin"
+                    className="text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    管理后台
+                  </Link>
+                )}
                 <span className="text-sm text-gray-700">{user.name}</span>
                 <button
                   onClick={handleLogout}
@@ -52,3 +60,4 @@ export default function Navbar() {
     </nav>
   );
 }
+

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 interface User {
   id: number;
   name: string;
+  role: string;
 }
 
 export function useCurrentUser() {
@@ -29,3 +30,4 @@ export function useCurrentUser() {
 
   return { user, loading, mutate: fetchUser };
 }
+
