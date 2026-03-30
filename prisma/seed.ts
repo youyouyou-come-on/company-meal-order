@@ -8,14 +8,47 @@ const adapter = new PrismaBetterSqlite3({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  for (const name of ["张三", "李四", "王五"]) {
+  const users = [
+    "杨凌云",
+    "吴杭栋",
+    "郭衢杭",
+    "张航钢",
+    "赵炳鑫",
+    "钱磊",
+    "张慧彬",
+    "聂荷艳",
+    "张丽君",
+    "陈小燕",
+    "朱亚南",
+    "张英俊",
+    "李勤",
+    "郭治平",
+    "张霄",
+    "段国梅",
+    "霍丁",
+    "张小龙",
+    "李蒙",
+    "陈顺来",
+    "黄珊",
+    "丁夏珍",
+    "占宇杰",
+    "陈张一",
+    "张云杰",
+    "陈三胜",
+    "张佳辉",
+    "陈晗",
+    "杨方璘",
+    "杜平花",
+  ];
+
+  for (const name of users) {
     await prisma.user.upsert({
       where: { name },
       update: {},
       create: { name },
     });
   }
-  console.log("Users created: 张三, 李四, 王五");
+  console.log(`Users ensured: ${users.join("、")}`);
 
   const menus: { date: string; lunch: string; dinner: string }[] = [
     { date: "2026-02-09", lunch: "红烧肉、清炒时蔬、番茄蛋汤", dinner: "宫保鸡丁、蒜蓉西兰花、紫菜蛋花汤" },

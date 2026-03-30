@@ -99,6 +99,7 @@ export default function LoginPage() {
             <input
               type="text"
               value={search}
+              data-testid="user-search-input"
               placeholder={loadingUsers ? "加载中..." : "输入姓名搜索..."}
               disabled={loadingUsers}
               onChange={(e) => {
@@ -120,6 +121,7 @@ export default function LoginPage() {
                     <button
                       key={user.id}
                       type="button"
+                      data-testid={`user-option-${user.id}`}
                       onClick={() => selectUser(user.name)}
                       className={`w-full px-4 py-2.5 text-left text-sm hover:bg-amber-50 transition-colors ${
                         selectedName === user.name
@@ -149,6 +151,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
+            data-testid="login-submit"
             disabled={loading || loadingUsers || !selectedName}
             className="w-full rounded-xl bg-amber-500 px-4 py-3 text-white font-bold text-base hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
@@ -159,4 +162,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

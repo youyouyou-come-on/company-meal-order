@@ -6,8 +6,8 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 interface Suggestion {
   id: number;
   content: string;
-  userName: string;
   createdAt: string;
+  isMine: boolean;
 }
 
 function timeAgo(dateStr: string): string {
@@ -90,10 +90,10 @@ export default function SuggestionsPage() {
         {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-amber-800">
-            🍽️ 下周想吃什么？
+            📝 建议专区
           </h1>
           <p className="mt-2 text-amber-600">
-            提交你的菜品建议，让食堂更懂你
+            前台匿名展示，后台会保留提交记录
           </p>
         </div>
 
@@ -104,8 +104,9 @@ export default function SuggestionsPage() {
               <input
                 type="text"
                 value={content}
+                data-testid="suggestion-input"
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="想吃什么菜？比如：糖醋排骨"
+                placeholder="匿名提建议，比如：想吃糖醋排骨"
                 maxLength={100}
                 className="flex-1 rounded-xl border border-amber-200 px-4 py-3 text-gray-800 placeholder-gray-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
                 onKeyDown={(e) => {
@@ -114,10 +115,11 @@ export default function SuggestionsPage() {
               />
               <button
                 onClick={handleSubmit}
+                data-testid="suggestion-submit"
                 disabled={submitting || !content.trim()}
                 className="rounded-xl bg-amber-500 px-6 py-3 font-medium text-white hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {submitting ? "提交中..." : "提交建议"}
+                {submitting ? "提交中..." : "匿名提交"}
               </button>
             </div>
             <div className="mt-2 flex justify-between text-xs text-gray-400">
@@ -127,7 +129,7 @@ export default function SuggestionsPage() {
           </div>
         ) : (
           <div className="mb-8 rounded-2xl bg-white p-6 text-center shadow-sm">
-            <p className="text-gray-500">登录后可以提交建议哦 🔑</p>
+            <p className="text-gray-500">登录后可以匿名提交建议哦 🔑</p>
           </div>
         )}
 
@@ -143,22 +145,23 @@ export default function SuggestionsPage() {
             {suggestions.map((s) => (
               <div
                 key={s.id}
+                data-testid={`suggestion-item-${s.id}`}
                 className="flex items-center justify-between rounded-2xl bg-white px-5 py-4 shadow-sm"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700">
-                    {s.userName.charAt(0)}
+                    匿
                   </div>
                   <div className="min-w-0">
                     <p className="text-gray-800 font-medium truncate">
                       {s.content}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {s.userName} · {timeAgo(s.createdAt)}
+                      匿名同事 · {timeAgo(s.createdAt)}
                     </p>
                   </div>
                 </div>
-                {user && user.name === s.userName && (
+                {user && s.isMine && (
                   <button
                     onClick={() => handleDelete(s.id)}
                     className="ml-3 shrink-0 rounded-lg px-3 py-1 text-xs text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
@@ -174,4 +177,3 @@ export default function SuggestionsPage() {
     </div>
   );
 }
-

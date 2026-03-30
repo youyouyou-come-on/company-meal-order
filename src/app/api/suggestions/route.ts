@@ -4,16 +4,17 @@ import { getSession } from "@/lib/session";
 
 export async function GET() {
   try {
+    const session = await getSession();
     const suggestions = await prisma.dishSuggestion.findMany({
       orderBy: { createdAt: "desc" },
-      include: { user: { select: { name: true } } },
+      include: { user: { select: { id: true, name: true } } },
     });
     return NextResponse.json({
       suggestions: suggestions.map((s) => ({
         id: s.id,
         content: s.content,
-        userName: s.user.name,
         createdAt: s.createdAt.toISOString(),
+        isMine: session.userId === s.user.id,
       })),
     });
   } catch {
@@ -100,4 +101,3 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
-

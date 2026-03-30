@@ -1,18 +1,27 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-function getWeekRange(now: Date): { start: Date; end: Date } {
-  // Get Monday of the current week (UTC)
-  const day = now.getUTCDay(); // 0=Sun, 1=Mon, ...
-  const diffToMonday = day === 0 ? -6 : 1 - day;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-  const monday = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() + diffToMonday
-    )
-  );
+function getWeekRange(weekStart?: string): { start: Date; end: Date } {
+  let monday: Date;
+
+  if (weekStart) {
+    monday = new Date(`${weekStart}T00:00:00.000Z`);
+  } else {
+    const now = new Date();
+    const day = now.getUTCDay(); // 0=Sun, 1=Mon, ...
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+
+    monday = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() + diffToMonday
+      )
+    );
+  }
 
   const sunday = new Date(
     Date.UTC(
@@ -25,10 +34,35 @@ function getWeekRange(now: Date): { start: Date; end: Date } {
   return { start: monday, end: sunday };
 }
 
-export async function GET() {
+function serializeMenus(
+  menus: Array<{ id: number; date: Date; mealType: string; dishes: string }>
+) {
+  const deduped = new Map<
+    string,
+    { id: number; date: string; mealType: string; dishes: string }
+  >();
+
+  for (const menu of menus) {
+    const date = menu.date.toISOString().split("T")[0];
+    deduped.set(`${date}-${menu.mealType}`, {
+      id: menu.id,
+      date,
+      mealType: menu.mealType,
+      dishes: menu.dishes,
+    });
+  }
+
+  return Array.from(deduped.values()).sort((a, b) => {
+    if (a.date === b.date) return a.mealType.localeCompare(b.mealType);
+    return a.date.localeCompare(b.date);
+  });
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const now = new Date();
-    const { start, end } = getWeekRange(now);
+    const { searchParams } = new URL(request.url);
+    const weekStart = searchParams.get("weekStart") ?? undefined;
+    const { start, end } = getWeekRange(weekStart);
 
     const menus = await prisma.weeklyMenu.findMany({
       where: {
@@ -37,17 +71,13 @@ export async function GET() {
           lte: end,
         },
       },
-      orderBy: [{ date: "asc" }, { mealType: "asc" }],
+      orderBy: [{ date: "asc" }, { mealType: "asc" }, { id: "asc" }],
     });
 
-    return NextResponse.json({
-      menus: menus.map((m) => ({
-        id: m.id,
-        date: m.date.toISOString().split("T")[0],
-        mealType: m.mealType,
-        dishes: m.dishes,
-      })),
-    });
+    return NextResponse.json(
+      { menus: serializeMenus(menus) },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch {
     return NextResponse.json(
       { error: "获取菜单失败" },
@@ -55,4 +85,3 @@ export async function GET() {
     );
   }
 }
-

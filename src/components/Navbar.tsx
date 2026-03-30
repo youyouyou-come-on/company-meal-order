@@ -27,7 +27,7 @@ export default function Navbar() {
               href="/suggestions"
               className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-amber-50 hover:text-amber-800"
             >
-              想吃什么
+              建议专区
             </Link>
             {loading ? (
               <span className="text-sm text-gray-400">加载中...</span>
