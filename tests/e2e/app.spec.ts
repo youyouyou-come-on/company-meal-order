@@ -166,6 +166,26 @@ test("login does not expose employee list and requires the shared password", asy
   await expect(page.getByText("姓名或密码错误")).toBeVisible();
 });
 
+test("login locks the current ip for 15 minutes after 10 failed attempts", async ({ page }) => {
+  await page.goto("/login");
+
+  for (let i = 1; i <= 9; i += 1) {
+    await page.getByTestId("login-name-input").fill(e2eUserName);
+    await page.getByTestId("login-password-input").fill(`wrong-password-${i}`);
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByText("姓名或密码错误")).toBeVisible();
+  }
+
+  await page.getByTestId("login-name-input").fill(e2eUserName);
+  await page.getByTestId("login-password-input").fill("wrong-password-10");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByText("当前网络尝试过多，请 15 分钟后再试")).toBeVisible();
+
+  await page.getByTestId("login-password-input").fill(loginPassword);
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByText("当前网络尝试过多，请 15 分钟后再试")).toBeVisible();
+});
+
 test("user can login and logout repeatedly", async ({ page }) => {
   await login(page, e2eUserName);
   await logout(page);

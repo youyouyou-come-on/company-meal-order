@@ -42,3 +42,12 @@ model DishSuggestion {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
 }
+
+model LoginThrottle {
+  id          Int       @id @default(autoincrement())
+  ip          String    @unique
+  failedCount Int       @default(0)
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
