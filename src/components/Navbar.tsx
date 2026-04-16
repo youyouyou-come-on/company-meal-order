@@ -1,10 +1,42 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export default function Navbar() {
   const { user, loading } = useCurrentUser();
+
+  useEffect(() => {
+    if (!user) return;
+
+    async function refreshLogin() {
+      try {
+        await fetch("/api/auth/me", { cache: "no-store" });
+      } catch {
+        // ignore session refresh errors and let normal page requests handle state
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshLogin();
+    }, 5 * 60 * 1000);
+
+    function handleVisible() {
+      if (document.visibilityState === "visible") {
+        void refreshLogin();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisible);
+    window.addEventListener("focus", handleVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisible);
+      window.removeEventListener("focus", handleVisible);
+    };
+  }, [user?.id]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });

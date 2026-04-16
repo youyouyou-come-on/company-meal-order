@@ -7,14 +7,45 @@ RUNTIME_DIR="$ROOT_DIR/.runtime"
 SOURCE_DB="$ROOT_DIR/prod.db"
 TEST_DB="$RUNTIME_DIR/e2e.db"
 PORT="${PORT:-3100}"
+PRISMA_BIN="$ROOT_DIR/node_modules/.bin/prisma"
+NEXT_BIN="$ROOT_DIR/node_modules/.bin/next"
+BUILD_ID_FILE="$ROOT_DIR/.next/BUILD_ID"
+
+export PATH="$ROOT_DIR/node_modules/.bin:$PATH"
 
 mkdir -p "$RUNTIME_DIR"
 rm -f "$TEST_DB" "$TEST_DB-journal"
-cp "$SOURCE_DB" "$TEST_DB"
+
+if [[ -f "$SOURCE_DB" ]]; then
+  cp "$SOURCE_DB" "$TEST_DB"
+else
+  echo "prod.db not found, creating a seeded E2E database in .runtime/e2e.db"
+  cd "$ROOT_DIR"
+  if [[ ! -f "$ROOT_DIR/src/generated/prisma/client.ts" ]]; then
+    "$PRISMA_BIN" generate
+  fi
+  env \
+    DEBUG="${DEBUG:-prisma:*}" \
+    RUST_LOG="${RUST_LOG:-info}" \
+    PRISMA_SCHEMA_ENGINE_LOG_LEVEL="${PRISMA_SCHEMA_ENGINE_LOG_LEVEL:-trace}" \
+    DATABASE_URL="file:./.runtime/e2e.db" \
+    "$PRISMA_BIN" db push
+  env \
+    DEBUG="${DEBUG:-prisma:*}" \
+    RUST_LOG="${RUST_LOG:-info}" \
+    PRISMA_SCHEMA_ENGINE_LOG_LEVEL="${PRISMA_SCHEMA_ENGINE_LOG_LEVEL:-trace}" \
+    DATABASE_URL="file:./.runtime/e2e.db" \
+    "$PRISMA_BIN" db seed
+fi
 
 cd "$ROOT_DIR"
+if [[ ! -f "$BUILD_ID_FILE" ]]; then
+  echo "Production build not found, building the app for E2E..."
+  "$NEXT_BIN" build
+fi
+
 exec env \
   PORT="$PORT" \
   DATABASE_URL="file:./.runtime/e2e.db" \
   COOKIE_SECURE="false" \
-  ./node_modules/.bin/next start
+  "$NEXT_BIN" start

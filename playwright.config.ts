@@ -1,6 +1,12 @@
 import "dotenv/config";
 import { defineConfig, devices } from "@playwright/test";
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3100";
+const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL || "chrome";
+const useManagedWebServer =
+  process.env.PLAYWRIGHT_SKIP_WEBSERVER !== "1" &&
+  process.env.PLAYWRIGHT_BASE_URL === undefined;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -11,23 +17,25 @@ export default defineConfig({
   },
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:3100",
+    baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "off",
   },
-  webServer: {
-    command: "./scripts/start-e2e.sh",
-    url: "http://127.0.0.1:3100/login",
-    reuseExistingServer: false,
-    timeout: 120_000,
-  },
+  webServer: useManagedWebServer
+    ? {
+        command: "./scripts/start-e2e.sh",
+        url: "http://127.0.0.1:3100/login",
+        reuseExistingServer: false,
+        timeout: 120_000,
+      }
+    : undefined,
   projects: [
     {
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
-        channel: "chrome",
+        channel: browserChannel,
       },
     },
   ],

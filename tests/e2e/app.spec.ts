@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const adminPassword = process.env.ADMIN_PASSWORD ?? "";
+const loginPassword = process.env.LOGIN_PASSWORD ?? "hzzcgc";
 const e2eUserName = "张英俊";
 const e2eSecondUserName = "杜平花";
 type MealType = "lunch" | "dinner";
@@ -44,8 +45,8 @@ function getMondayFromDate(dateStr: string) {
 async function login(page: Page, userName = e2eUserName) {
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "公司点餐系统" })).toBeVisible();
-  await page.getByTestId("user-search-input").fill(userName);
-  await page.getByRole("button", { name: userName }).click();
+  await page.getByTestId("login-name-input").fill(userName);
+  await page.getByTestId("login-password-input").fill(loginPassword);
   await page.getByTestId("login-submit").click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText(userName, { exact: true })).toBeVisible();
@@ -57,11 +58,16 @@ async function logout(page: Page) {
   await expect(page.getByRole("heading", { name: "公司点餐系统" })).toBeVisible();
 }
 
-async function openMealCard(page: Page, date: string, week: "current" | "next") {
+async function openMealCard(
+  page: Page,
+  date: string,
+  week: "current" | "next",
+  mealType: MealType = "lunch"
+) {
   await page.goto("/");
   await page.getByRole("button", { name: week === "next" ? "下周点餐" : "本周点餐" }).click();
   await page.getByTestId(`home-day-tab-${date}`).click();
-  const mealCard = page.getByTestId(`home-meal-${date}-lunch`);
+  const mealCard = page.getByTestId(`home-meal-${date}-${mealType}`);
   await expect(mealCard).toBeVisible();
   return mealCard;
 }
@@ -101,6 +107,35 @@ async function setAdminMenuByApi(
   expect(response.ok()).toBeTruthy();
 }
 
+async function ensureSignupState(
+  page: Page,
+  date: string,
+  mealType: MealType,
+  shouldBeSignedUp: boolean
+) {
+  const mealCard = await openMealCard(page, date, "next", mealType);
+  const signupButton = mealCard.getByRole("button", { name: /吃$/ });
+  const cancelButton = mealCard.getByRole("button", { name: /不吃了/ });
+
+  if (shouldBeSignedUp) {
+    if (await signupButton.isVisible().catch(() => false)) {
+      await signupButton.click();
+      await expect(cancelButton).toBeVisible();
+    } else {
+      await expect(cancelButton).toBeVisible();
+    }
+    return mealCard;
+  }
+
+  if (await cancelButton.isVisible().catch(() => false)) {
+    await cancelButton.click();
+    await expect(signupButton).toBeVisible();
+  } else {
+    await expect(signupButton).toBeVisible();
+  }
+  return mealCard;
+}
+
 test.describe.configure({ mode: "serial" });
 
 test("user can login and view current meal cards", async ({ page }) => {
@@ -113,6 +148,22 @@ test("user can login and view current meal cards", async ({ page }) => {
   await expect(page.getByTestId(`home-meal-${activeDate}-dinner`)).toBeVisible();
   await expect(page.getByRole("link", { name: "建议专区" })).toBeVisible();
   await expect(page.getByRole("link", { name: "管理菜单" })).toBeVisible();
+});
+
+test("login does not expose employee list and requires the shared password", async ({ page }) => {
+  await page.goto("/login");
+  await expect(page.getByText("选择你的名字")).not.toBeVisible();
+  await expect(page.getByText("张英俊")).not.toBeVisible();
+  await expect(page.getByTestId("login-name-input")).toBeVisible();
+  await expect(page.getByTestId("login-password-input")).toBeVisible();
+
+  const usersResponse = await page.request.get("/api/auth/users");
+  expect(usersResponse.status()).toBe(404);
+
+  await page.getByTestId("login-name-input").fill(e2eUserName);
+  await page.getByTestId("login-password-input").fill("wrong-password");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByText("姓名或密码错误")).toBeVisible();
 });
 
 test("user can login and logout repeatedly", async ({ page }) => {
@@ -255,4 +306,73 @@ test("signup data persists after reload and re-login", async ({ page }) => {
 
   await mealCard.getByRole("button", { name: /不吃了/ }).click();
   await expect(mealCard.getByRole("button", { name: /吃$/ })).toBeVisible();
+});
+
+test("guest can browse suggestions but must login before signing up", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "请先登录" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "请先登录" }).first().click();
+  await expect(page).toHaveURL(/\/login$/);
+
+  await page.goto("/suggestions");
+  await expect(page.getByText("登录后可以匿名提交建议哦")).toBeVisible();
+  await expect(page.getByTestId("suggestion-input")).not.toBeVisible();
+});
+
+test("admin verification rejects wrong password and accepts the correct one", async ({ page }) => {
+  test.skip(!adminPassword, "ADMIN_PASSWORD is required for admin e2e coverage.");
+
+  await login(page);
+  await page.goto("/admin");
+
+  await page.getByTestId("admin-password-input").fill("definitely-wrong-password");
+  await page.getByTestId("admin-password-submit").click();
+  await expect(page.getByText("密码错误")).toBeVisible();
+  await expect(page.getByTestId("admin-week-grid")).not.toBeVisible();
+
+  await page.getByTestId("admin-password-input").fill(adminPassword);
+  await page.getByTestId("admin-password-submit").click();
+  await expect(page.getByTestId("admin-week-grid")).toBeVisible();
+});
+
+test("two users see consistent signup counts and attendee names", async ({ browser }) => {
+  const firstContext = await browser.newContext();
+  const secondContext = await browser.newContext();
+  const firstPage = await firstContext.newPage();
+  const secondPage = await secondContext.newPage();
+  const targetDate = nextWeekMondayIsoDate();
+
+  try {
+    await login(firstPage, e2eUserName);
+    await login(secondPage, e2eSecondUserName);
+
+    await ensureSignupState(firstPage, targetDate, "dinner", false);
+    await ensureSignupState(secondPage, targetDate, "dinner", false);
+
+    let firstMealCard = await ensureSignupState(firstPage, targetDate, "dinner", true);
+    await expect(firstMealCard).toContainText("1 人");
+    await expect(firstMealCard).toContainText(e2eUserName);
+
+    let secondMealCard = await openMealCard(secondPage, targetDate, "next", "dinner");
+    await secondPage.reload();
+    secondMealCard = await openMealCard(secondPage, targetDate, "next", "dinner");
+    await expect(secondMealCard).toContainText("1 人");
+    await expect(secondMealCard).toContainText(e2eUserName);
+
+    secondMealCard = await ensureSignupState(secondPage, targetDate, "dinner", true);
+    await expect(secondMealCard).toContainText("2 人");
+    await expect(secondMealCard).toContainText(e2eUserName);
+    await expect(secondMealCard).toContainText(e2eSecondUserName);
+
+    await firstPage.reload();
+    firstMealCard = await openMealCard(firstPage, targetDate, "next", "dinner");
+    await expect(firstMealCard).toContainText("2 人");
+    await expect(firstMealCard).toContainText(e2eUserName);
+    await expect(firstMealCard).toContainText(e2eSecondUserName);
+  } finally {
+    await ensureSignupState(firstPage, targetDate, "dinner", false).catch(() => {});
+    await ensureSignupState(secondPage, targetDate, "dinner", false).catch(() => {});
+    await firstContext.close();
+    await secondContext.close();
+  }
 });

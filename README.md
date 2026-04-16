@@ -57,12 +57,46 @@ pnpm start
 # 或指定端口: PORT=8080 pnpm start
 ```
 
+### 远程一键部署
+
+适用于 **Ubuntu / Debian 新服务器**，默认通过 `root` SSH 远程部署。
+
+```bash
+cp deploy-remote.env.example deploy-remote.env
+# 编辑 deploy-remote.env
+source ./deploy-remote.env
+./scripts/deploy-remote.sh
+```
+
+脚本会自动完成这些事：
+
+- 安装 Node.js、pnpm、构建依赖
+- 同步项目代码到远程目录
+- 生成或复用远程 `.env`
+- 初始化数据库并在首次部署时执行种子数据
+- 构建生产包并配置 `systemd` 开机自启
+- 按需安装 Nginx、绑定域名、申请 Let’s Encrypt 证书
+
+常用变量：
+
+- `DEPLOY_HOST`：服务器 IP 或域名
+- `SSH_PASSWORD`：如果还没配 SSH key，可以直接填服务器密码
+- `DEPLOY_PATH`：远程部署目录
+- `SESSION_PASSWORD`：首次部署时必填
+- `LOGIN_PASSWORD`：员工登录统一密码，首次部署时必填
+- `ADMIN_PASSWORD`：首次部署时必填
+- `APP_DOMAINS`：域名列表，多个域名用空格分隔
+- `ENABLE_HTTPS=1`：自动申请 HTTPS
+
+如果只是普通更新，后续再次执行同一条命令即可。脚本会保留远程 `prod.db`，并默认沿用已有管理员密码与 session 密钥。
+
 ## ⚙️ 环境变量
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `DATABASE_URL` | SQLite 数据库路径 | `file:./prod.db` |
 | `SESSION_PASSWORD` | Session 加密密钥（≥32 字符） | 无，必须设置 |
+| `LOGIN_PASSWORD` | 员工登录统一密码 | 无，必须设置 |
 | `ADMIN_PASSWORD` | 管理后台密码 | `123456` |
 | `COOKIE_SECURE` | HTTPS 时设为 `true` | `false` |
 
