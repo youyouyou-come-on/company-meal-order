@@ -167,6 +167,10 @@ test("user can login and view current meal cards", async ({ page }) => {
 
   await expect(page.getByTestId(`home-day-tab-${activeDate}`)).toBeVisible();
   await expect(page.getByTestId(`home-selected-day-${activeDate}`)).toBeVisible();
+  await expect(page.getByTestId(`home-selected-day-summary-${activeDate}-lunch`)).toBeVisible();
+  await expect(page.getByTestId(`home-selected-day-summary-${activeDate}-dinner`)).toBeVisible();
+  await expect(page.getByText("午餐总份数")).toBeVisible();
+  await expect(page.getByText("晚餐总份数")).toBeVisible();
   await expect(page.getByTestId(`home-meal-${activeDate}-lunch`)).toBeVisible();
   await expect(page.getByTestId(`home-meal-${activeDate}-dinner`)).toBeVisible();
   await expect(page.getByText("当天合计")).not.toBeVisible();
@@ -317,6 +321,9 @@ test("user can adjust next week's lunch quantity and cancel it later", async ({ 
   await expect(refreshedMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
     String(baselineTotal + 2)
   );
+  await expect(page.getByTestId(`home-selected-day-summary-${targetDate}-lunch`)).toContainText(
+    String(baselineTotal + 2)
+  );
   await expect(refreshedMealCard).toContainText(`${e2eUserName} × 2`);
   await expect(page.getByTestId(`home-meal-${targetDate}-lunch-status-note`)).toContainText("你当前已点 2 份");
 
@@ -330,6 +337,9 @@ test("user can adjust next week's lunch quantity and cancel it later", async ({ 
 
   await refreshedMealCard.locator('button[data-testid$="-cancel"]').click();
   await expect(refreshedMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
+    String(baselineTotal)
+  );
+  await expect(page.getByTestId(`home-selected-day-summary-${targetDate}-lunch`)).toContainText(
     String(baselineTotal)
   );
   await expect(refreshedMealCard).not.toContainText(`${e2eUserName} × 3`);

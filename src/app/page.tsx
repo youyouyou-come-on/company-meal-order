@@ -246,6 +246,14 @@ export default function Home() {
   };
 
   const selectedDateLabel = formatDateLabel(selectedDate);
+  const selectedLunchTotal = getSignups(selectedDate, "lunch").reduce(
+    (sum, signup) => sum + signup.quantity,
+    0
+  );
+  const selectedDinnerTotal = getSignups(selectedDate, "dinner").reduce(
+    (sum, signup) => sum + signup.quantity,
+    0
+  );
 
   const chinaHour = (new Date().getUTCHours() + 8) % 24;
   let greeting = "";
@@ -360,6 +368,30 @@ export default function Home() {
             </div>
           </div>
 
+          <div
+            data-testid={`home-selected-day-summary-${selectedDate}`}
+            className="mb-4 grid gap-3 sm:grid-cols-2"
+          >
+            <div
+              data-testid={`home-selected-day-summary-${selectedDate}-lunch`}
+              className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3"
+            >
+              <div className="text-xs font-semibold tracking-wide text-amber-700">午餐总份数</div>
+              <div className="mt-1 text-3xl font-extrabold leading-none text-gray-900">
+                {selectedLunchTotal}
+              </div>
+            </div>
+            <div
+              data-testid={`home-selected-day-summary-${selectedDate}-dinner`}
+              className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3"
+            >
+              <div className="text-xs font-semibold tracking-wide text-amber-700">晚餐总份数</div>
+              <div className="mt-1 text-3xl font-extrabold leading-none text-gray-900">
+                {selectedDinnerTotal}
+              </div>
+            </div>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-2">
             <MealBlock
               date={selectedDate}
@@ -470,7 +502,7 @@ function MealBlock({
           <p className="mt-1 text-sm font-semibold text-amber-700">{cutoffText}</p>
         </div>
         <div className="min-w-[100px] rounded-2xl bg-amber-500 px-3 py-3 text-center text-white">
-          <div className="text-xs font-semibold tracking-wide text-amber-100">点餐份数</div>
+          <div className="text-xs font-semibold tracking-wide text-amber-100">本餐总份数</div>
           <div
             data-testid={`${testId}-total-quantity`}
             className="text-4xl font-extrabold leading-none"
@@ -526,7 +558,7 @@ function MealBlock({
               </div>
               {hasSignup ? (
                 <div className="text-right text-xs font-semibold text-amber-600">
-                  当前已点 {currentUserQuantity} 份
+                  你已点 {currentUserQuantity} 份
                 </div>
               ) : null}
             </div>
@@ -604,7 +636,7 @@ function MealBlock({
 
       <div className="rounded-2xl bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-bold text-gray-700">点餐明细</span>
+          <span className="text-sm font-bold text-gray-700">本餐点餐明细</span>
           <span className="text-sm font-bold text-amber-600">{totalQuantity} 份</span>
         </div>
         {signups.length > 0 ? (
