@@ -14,12 +14,16 @@ interface Menu {
 interface Signup {
   id: number;
   userName: string;
+  quantity: number;
 }
 
 type MealType = "lunch" | "dinner";
 type SignupMap = Record<string, Signup[]>;
+type QuantityDraftMap = Record<string, number>;
 
 const DAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+const MIN_MEAL_QUANTITY = 1;
+const MAX_MEAL_QUANTITY = 20;
 
 function getWeekDates(weekOffset: number): string[] {
   const now = new Date();
@@ -73,6 +77,27 @@ function slotKey(date: string, mealType: MealType) {
   return `${date}-${mealType}`;
 }
 
+function clampMealQuantity(value: number) {
+  if (!Number.isFinite(value)) {
+    return MIN_MEAL_QUANTITY;
+  }
+
+  return Math.min(MAX_MEAL_QUANTITY, Math.max(MIN_MEAL_QUANTITY, Math.trunc(value)));
+}
+
+function getSignupQuantity(signups: Signup[], userName?: string | null) {
+  if (!userName) {
+    return 0;
+  }
+
+  return signups.find((signup) => signup.userName === userName)?.quantity ?? 0;
+}
+
+function getInitialDraftQuantity(signups: Signup[], userName?: string | null) {
+  const quantity = getSignupQuantity(signups, userName);
+  return quantity > 0 ? quantity : MIN_MEAL_QUANTITY;
+}
+
 export default function Home() {
   const { user, loading: userLoading } = useCurrentUser();
   const router = useRouter();
@@ -81,6 +106,7 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [signupsBySlot, setSignupsBySlot] = useState<SignupMap>({});
+  const [quantityDrafts, setQuantityDrafts] = useState<QuantityDraftMap>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const signupRequestVersionRef = useRef<Record<string, number>>({});
 
@@ -110,10 +136,18 @@ export default function Home() {
         return;
       }
 
+      const lunchSignups = lunchData.signups || [];
+      const dinnerSignups = dinnerData.signups || [];
+
       setSignupsBySlot((current) => ({
         ...current,
-        [slotKey(date, "lunch")]: lunchData.signups || [],
-        [slotKey(date, "dinner")]: dinnerData.signups || [],
+        [slotKey(date, "lunch")]: lunchSignups,
+        [slotKey(date, "dinner")]: dinnerSignups,
+      }));
+      setQuantityDrafts((current) => ({
+        ...current,
+        [slotKey(date, "lunch")]: getInitialDraftQuantity(lunchSignups, user?.name),
+        [slotKey(date, "dinner")]: getInitialDraftQuantity(dinnerSignups, user?.name),
       }));
     } catch {
       if (signupRequestVersionRef.current[date] !== requestVersion) {
@@ -125,11 +159,17 @@ export default function Home() {
         [slotKey(date, "lunch")]: [],
         [slotKey(date, "dinner")]: [],
       }));
+      setQuantityDrafts((current) => ({
+        ...current,
+        [slotKey(date, "lunch")]: MIN_MEAL_QUANTITY,
+        [slotKey(date, "dinner")]: MIN_MEAL_QUANTITY,
+      }));
     }
-  }, []);
+  }, [user?.name]);
 
   useEffect(() => {
     setSignupsBySlot({});
+    setQuantityDrafts({});
     Promise.all(weekDates.map((date) => fetchSignupsForDate(date))).catch(() => {});
   }, [fetchSignupsForDate, weekDates]);
 
@@ -141,14 +181,35 @@ export default function Home() {
     });
   }, [today, weekDates, weekStart]);
 
-  const handleSignup = async (date: string, mealType: MealType) => {
+  const getMenu = (date: string, mealType: MealType) =>
+    menus.find((menu) => menu.date === date && menu.mealType === mealType);
+
+  const getSignups = (date: string, mealType: MealType) =>
+    signupsBySlot[slotKey(date, mealType)] || [];
+
+  const getUserQuantity = (date: string, mealType: MealType) =>
+    getSignupQuantity(getSignups(date, mealType), user?.name);
+
+  const getDraftQuantity = (date: string, mealType: MealType) =>
+    quantityDrafts[slotKey(date, mealType)] ??
+    getInitialDraftQuantity(getSignups(date, mealType), user?.name);
+
+  const updateDraftQuantity = (date: string, mealType: MealType, nextQuantity: number) => {
+    setQuantityDrafts((current) => ({
+      ...current,
+      [slotKey(date, mealType)]: clampMealQuantity(nextQuantity),
+    }));
+  };
+
+  const handleConfirmQuantity = async (date: string, mealType: MealType) => {
     const loadingKey = slotKey(date, mealType);
+    const quantity = getDraftQuantity(date, mealType);
     setActionLoading(loadingKey);
     try {
       const response = await fetch("/api/signups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, mealType }),
+        body: JSON.stringify({ date, mealType, quantity }),
       });
 
       if (!response.ok) {
@@ -177,21 +238,14 @@ export default function Home() {
         return;
       }
 
+      updateDraftQuantity(date, mealType, MIN_MEAL_QUANTITY);
       await fetchSignupsForDate(date);
     } finally {
       setActionLoading(null);
     }
   };
 
-  const getMenu = (date: string, mealType: MealType) =>
-    menus.find((menu) => menu.date === date && menu.mealType === mealType);
-
-  const getSignups = (date: string, mealType: MealType) =>
-    signupsBySlot[slotKey(date, mealType)] || [];
-
   const selectedDateLabel = formatDateLabel(selectedDate);
-  const selectedTotal =
-    getSignups(selectedDate, "lunch").length + getSignups(selectedDate, "dinner").length;
 
   const chinaHour = (new Date().getUTCHours() + 8) % 24;
   let greeting = "";
@@ -297,20 +351,12 @@ export default function Home() {
           data-testid={`home-selected-day-${selectedDate}`}
           className="rounded-3xl border border-orange-100 bg-white p-4 shadow-md print:break-inside-avoid print:shadow-none"
         >
-          <div className="mb-4 flex items-center justify-between border-b border-orange-100 pb-3">
+          <div className="mb-4 border-b border-orange-100 pb-3">
             <div>
               <h2 className="text-2xl font-extrabold text-gray-900">
                 {selectedDateLabel.dayLabel}
               </h2>
               <p className="text-sm font-medium text-gray-500">{selectedDateLabel.shortDate}</p>
-            </div>
-            <div className="rounded-2xl bg-orange-50 px-3 py-2 text-right">
-              <div className="text-xs font-semibold tracking-wide text-amber-700">
-                当天合计
-              </div>
-              <div className="text-4xl font-extrabold leading-none text-amber-600">
-                {selectedTotal}
-              </div>
             </div>
           </div>
 
@@ -323,12 +369,14 @@ export default function Home() {
               cutoffText="截止 10:00"
               menu={getMenu(selectedDate, "lunch")}
               signups={getSignups(selectedDate, "lunch")}
-              isSignedUp={user ? getSignups(selectedDate, "lunch").some((signup) => signup.userName === user.name) : false}
+              currentUserQuantity={getUserQuantity(selectedDate, "lunch")}
+              draftQuantity={getDraftQuantity(selectedDate, "lunch")}
               isExpired={isExpiredClient(selectedDate, "lunch")}
               user={user}
               userLoading={userLoading}
               loading={actionLoading === slotKey(selectedDate, "lunch")}
-              onSignup={() => handleSignup(selectedDate, "lunch")}
+              onDraftQuantityChange={(quantity) => updateDraftQuantity(selectedDate, "lunch", quantity)}
+              onConfirmQuantity={() => handleConfirmQuantity(selectedDate, "lunch")}
               onCancel={() => handleCancel(selectedDate, "lunch")}
               onLogin={() => router.push("/login")}
             />
@@ -340,12 +388,14 @@ export default function Home() {
               cutoffText="截止 15:00"
               menu={getMenu(selectedDate, "dinner")}
               signups={getSignups(selectedDate, "dinner")}
-              isSignedUp={user ? getSignups(selectedDate, "dinner").some((signup) => signup.userName === user.name) : false}
+              currentUserQuantity={getUserQuantity(selectedDate, "dinner")}
+              draftQuantity={getDraftQuantity(selectedDate, "dinner")}
               isExpired={isExpiredClient(selectedDate, "dinner")}
               user={user}
               userLoading={userLoading}
               loading={actionLoading === slotKey(selectedDate, "dinner")}
-              onSignup={() => handleSignup(selectedDate, "dinner")}
+              onDraftQuantityChange={(quantity) => updateDraftQuantity(selectedDate, "dinner", quantity)}
+              onConfirmQuantity={() => handleConfirmQuantity(selectedDate, "dinner")}
               onCancel={() => handleCancel(selectedDate, "dinner")}
               onLogin={() => router.push("/login")}
             />
@@ -364,12 +414,14 @@ interface MealBlockProps {
   cutoffText: string;
   menu: Menu | undefined;
   signups: Signup[];
-  isSignedUp: boolean;
+  currentUserQuantity: number;
+  draftQuantity: number;
   isExpired: boolean;
   user: { id: number; name: string } | null;
   userLoading: boolean;
   loading: boolean;
-  onSignup: () => void;
+  onDraftQuantityChange: (quantity: number) => void;
+  onConfirmQuantity: () => void;
   onCancel: () => void;
   onLogin: () => void;
 }
@@ -382,27 +434,31 @@ function MealBlock({
   cutoffText,
   menu,
   signups,
-  isSignedUp,
+  currentUserQuantity,
+  draftQuantity,
   isExpired,
   user,
   userLoading,
   loading,
-  onSignup,
+  onDraftQuantityChange,
+  onConfirmQuantity,
   onCancel,
   onLogin,
 }: MealBlockProps) {
-  const signupCount = signups.length;
+  const totalQuantity = signups.reduce((sum, signup) => sum + signup.quantity, 0);
+  const hasSignup = currentUserQuantity > 0;
+  const isQuantityChanged = draftQuantity !== currentUserQuantity;
   const statusNote = userLoading
     ? "正在读取你的点餐状态。"
     : !user
-      ? "登录后才能报名或取消。"
-      : isSignedUp && isExpired
-        ? "你已经报名，但当前餐次已截止，不能再取消。"
+      ? "登录后才能点餐或取消。"
+      : hasSignup && isExpired
+        ? `你已点 ${currentUserQuantity} 份，但当前餐次已截止，不能再修改。`
         : isExpired
-          ? "当前餐次已经截止，不能再报名。"
-          : isSignedUp
-            ? "如果临时不吃了，可以点“不吃了”取消。"
-            : "现在点“吃”，截止前都还能改回“不吃了”。";
+          ? "当前餐次已经截止，不能再点餐。"
+        : hasSignup
+            ? `你当前已点 ${currentUserQuantity} 份，如有客人可以直接调整份数。`
+            : "请选择 1 份或多份，确认后就会计入当前餐次。";
 
   return (
     <div data-testid={testId} className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4">
@@ -414,8 +470,13 @@ function MealBlock({
           <p className="mt-1 text-sm font-semibold text-amber-700">{cutoffText}</p>
         </div>
         <div className="min-w-[100px] rounded-2xl bg-amber-500 px-3 py-3 text-center text-white">
-          <div className="text-xs font-semibold tracking-wide text-amber-100">吃饭人数</div>
-          <div className="text-4xl font-extrabold leading-none">{signupCount}</div>
+          <div className="text-xs font-semibold tracking-wide text-amber-100">点餐份数</div>
+          <div
+            data-testid={`${testId}-total-quantity`}
+            className="text-4xl font-extrabold leading-none"
+          >
+            {totalQuantity}
+          </div>
         </div>
       </div>
 
@@ -442,12 +503,12 @@ function MealBlock({
           >
             请先登录
           </button>
-        ) : isSignedUp && isExpired ? (
+        ) : hasSignup && isExpired ? (
           <button
             disabled
             className="w-full rounded-2xl border border-amber-200 bg-amber-50 py-3 text-base font-bold text-amber-700"
           >
-            已报名（已截止）
+            已点 {currentUserQuantity} 份（已截止）
           </button>
         ) : isExpired ? (
           <button
@@ -456,22 +517,82 @@ function MealBlock({
           >
             已截止
           </button>
-        ) : isSignedUp ? (
-          <button
-            onClick={onCancel}
-            disabled={loading}
-            className="w-full rounded-2xl border border-red-200 bg-red-50 py-3 text-base font-bold text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
-          >
-            {loading ? "取消中..." : "😴 不吃了"}
-          </button>
         ) : (
-          <button
-            onClick={onSignup}
-            disabled={loading}
-            className="w-full rounded-2xl bg-green-500 py-3 text-base font-bold text-white transition-colors hover:bg-green-600 disabled:opacity-50"
-          >
-            {loading ? "报名中..." : "🍽️ 吃"}
-          </button>
+          <div className="rounded-2xl bg-white p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold text-gray-700">点餐份数</div>
+                <p className="mt-1 text-xs text-gray-500">支持帮来访客人一起代点</p>
+              </div>
+              {hasSignup ? (
+                <div className="text-right text-xs font-semibold text-amber-600">
+                  当前已点 {currentUserQuantity} 份
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                data-testid={`${testId}-quantity-minus`}
+                onClick={() => onDraftQuantityChange(draftQuantity - 1)}
+                disabled={loading || draftQuantity <= MIN_MEAL_QUANTITY}
+                className="h-11 w-11 rounded-2xl border border-orange-200 bg-orange-50 text-2xl font-bold text-amber-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                -
+              </button>
+              <input
+                type="number"
+                min={MIN_MEAL_QUANTITY}
+                max={MAX_MEAL_QUANTITY}
+                inputMode="numeric"
+                data-testid={`${testId}-quantity-input`}
+                value={draftQuantity}
+                onChange={(event) => onDraftQuantityChange(Number.parseInt(event.target.value || "1", 10))}
+                className="h-11 flex-1 rounded-2xl border border-orange-200 bg-orange-50 px-4 text-center text-lg font-bold text-gray-900 outline-none transition-colors focus:border-amber-400 focus:bg-white"
+              />
+              <button
+                type="button"
+                data-testid={`${testId}-quantity-plus`}
+                onClick={() => onDraftQuantityChange(draftQuantity + 1)}
+                disabled={loading || draftQuantity >= MAX_MEAL_QUANTITY}
+                className="h-11 w-11 rounded-2xl border border-orange-200 bg-orange-50 text-2xl font-bold text-amber-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                +
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                data-testid={`${testId}-confirm`}
+                onClick={onConfirmQuantity}
+                disabled={loading || (hasSignup && !isQuantityChanged)}
+                className="rounded-2xl bg-green-500 py-3 text-base font-bold text-white transition-colors hover:bg-green-600 disabled:cursor-not-allowed disabled:bg-green-300"
+              >
+                {loading
+                  ? hasSignup
+                    ? "更新中..."
+                    : "点餐中..."
+                  : hasSignup
+                    ? isQuantityChanged
+                      ? `更新为 ${draftQuantity} 份`
+                      : `已点 ${currentUserQuantity} 份`
+                    : `确认 ${draftQuantity} 份`}
+              </button>
+              {hasSignup ? (
+                <button
+                  type="button"
+                  data-testid={`${testId}-cancel`}
+                  onClick={onCancel}
+                  disabled={loading}
+                  className="rounded-2xl border border-red-200 bg-red-50 py-3 text-base font-bold text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
+                >
+                  😴 不吃了
+                </button>
+              ) : null}
+            </div>
+          </div>
         )}
         <p
           data-testid={`${testId}-status-note`}
@@ -483,8 +604,8 @@ function MealBlock({
 
       <div className="rounded-2xl bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-bold text-gray-700">已报名名单</span>
-          <span className="text-sm font-bold text-amber-600">{signupCount} 人</span>
+          <span className="text-sm font-bold text-gray-700">点餐明细</span>
+          <span className="text-sm font-bold text-amber-600">{totalQuantity} 份</span>
         </div>
         {signups.length > 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -493,12 +614,12 @@ function MealBlock({
                 key={`${date}-${title}-${signup.id}`}
                 className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800"
               >
-                {signup.userName}
+                {signup.quantity > 1 ? `${signup.userName} × ${signup.quantity}` : signup.userName}
               </span>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-gray-400">还没有人报名</p>
+          <p className="text-xs text-gray-400">还没有人点餐</p>
         )}
       </div>
     </div>

@@ -29,6 +29,7 @@ model MealSignup {
   userId    Int
   date      DateTime
   mealType  String   // "lunch" or "dinner"
+  quantity  Int      @default(1)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
 

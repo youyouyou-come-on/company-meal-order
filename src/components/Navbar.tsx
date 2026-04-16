@@ -6,9 +6,10 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export default function Navbar() {
   const { user, loading } = useCurrentUser();
+  const userId = user?.id;
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
     async function refreshLogin() {
       try {
@@ -36,7 +37,7 @@ export default function Navbar() {
       document.removeEventListener("visibilitychange", handleVisible);
       window.removeEventListener("focus", handleVisible);
     };
-  }, [user?.id]);
+  }, [userId]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });

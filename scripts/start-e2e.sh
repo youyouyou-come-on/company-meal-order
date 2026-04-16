@@ -38,6 +38,24 @@ else
     "$PRISMA_BIN" db seed
 fi
 
+if [[ ! -f "$ROOT_DIR/src/generated/prisma/client.ts" ]]; then
+  "$PRISMA_BIN" generate
+fi
+
+env \
+  DEBUG="${DEBUG:-prisma:*}" \
+  RUST_LOG="${RUST_LOG:-info}" \
+  PRISMA_SCHEMA_ENGINE_LOG_LEVEL="${PRISMA_SCHEMA_ENGINE_LOG_LEVEL:-trace}" \
+  DATABASE_URL="file:./.runtime/e2e.db" \
+  "$PRISMA_BIN" db push
+
+env \
+  DEBUG="${DEBUG:-prisma:*}" \
+  RUST_LOG="${RUST_LOG:-info}" \
+  PRISMA_SCHEMA_ENGINE_LOG_LEVEL="${PRISMA_SCHEMA_ENGINE_LOG_LEVEL:-trace}" \
+  DATABASE_URL="file:./.runtime/e2e.db" \
+  "$PRISMA_BIN" db seed
+
 cd "$ROOT_DIR"
 if [[ ! -f "$BUILD_ID_FILE" ]]; then
   echo "Production build not found, building the app for E2E..."
@@ -47,6 +65,7 @@ fi
 exec env \
   PORT="$PORT" \
   DATABASE_URL="file:./.runtime/e2e.db" \
+  LOGIN_PASSWORD="${LOGIN_PASSWORD:-hzzcgc}" \
   LOGIN_LOCK_MAX_FAILED_ATTEMPTS="${LOGIN_LOCK_MAX_FAILED_ATTEMPTS:-10}" \
   LOGIN_LOCK_DURATION_MINUTES="${LOGIN_LOCK_DURATION_MINUTES:-15}" \
   COOKIE_SECURE="false" \

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const adminPassword = process.env.ADMIN_PASSWORD ?? "";
 const loginPassword = process.env.LOGIN_PASSWORD ?? "hzzcgc";
@@ -115,32 +115,47 @@ async function setAdminMenuByApi(
   expect(response.ok()).toBeTruthy();
 }
 
-async function ensureSignupState(
+async function readMealTotalQuantity(mealCard: Locator) {
+  const value = await mealCard.locator('[data-testid$="-total-quantity"]').textContent();
+  return Number.parseInt(value ?? "0", 10);
+}
+
+async function setMealQuantity(mealCard: Locator, quantity: number) {
+  await mealCard.locator('input[data-testid$="-quantity-input"]').fill(String(quantity));
+}
+
+async function confirmMealQuantity(mealCard: Locator) {
+  const confirmButton = mealCard.locator('button[data-testid$="-confirm"]');
+  if (!(await confirmButton.isDisabled())) {
+    await confirmButton.click();
+  }
+}
+
+async function ensureMealQuantity(
   page: Page,
   date: string,
   mealType: MealType,
-  shouldBeSignedUp: boolean
+  quantity: number
 ) {
   const mealCard = await openMealCard(page, date, "next", mealType);
-  const signupButton = mealCard.getByRole("button", { name: /吃$/ });
-  const cancelButton = mealCard.getByRole("button", { name: /不吃了/ });
+  const confirmButton = mealCard.locator('button[data-testid$="-confirm"]');
+  const cancelButton = mealCard.locator('button[data-testid$="-cancel"]');
+  const quantityInput = mealCard.locator('input[data-testid$="-quantity-input"]');
 
-  if (shouldBeSignedUp) {
-    if (await signupButton.isVisible().catch(() => false)) {
-      await signupButton.click();
-      await expect(cancelButton).toBeVisible();
+  if (quantity === 0) {
+    if (await cancelButton.isVisible().catch(() => false)) {
+      await cancelButton.click();
+      await expect(confirmButton).toBeVisible();
     } else {
-      await expect(cancelButton).toBeVisible();
+      await expect(confirmButton).toBeVisible();
     }
     return mealCard;
   }
 
-  if (await cancelButton.isVisible().catch(() => false)) {
-    await cancelButton.click();
-    await expect(signupButton).toBeVisible();
-  } else {
-    await expect(signupButton).toBeVisible();
-  }
+  await setMealQuantity(mealCard, quantity);
+  await confirmMealQuantity(mealCard);
+  await expect(cancelButton).toBeVisible();
+  await expect(quantityInput).toHaveValue(String(quantity));
   return mealCard;
 }
 
@@ -154,6 +169,7 @@ test("user can login and view current meal cards", async ({ page }) => {
   await expect(page.getByTestId(`home-selected-day-${activeDate}`)).toBeVisible();
   await expect(page.getByTestId(`home-meal-${activeDate}-lunch`)).toBeVisible();
   await expect(page.getByTestId(`home-meal-${activeDate}-dinner`)).toBeVisible();
+  await expect(page.getByText("当天合计")).not.toBeVisible();
   await expect(page.getByRole("link", { name: "建议专区" })).toBeVisible();
   await expect(page.getByRole("link", { name: "管理菜单" })).toBeVisible();
 });
@@ -168,34 +184,67 @@ test("login does not expose employee list and requires the shared password", asy
   const usersResponse = await page.request.get("/api/auth/users");
   expect(usersResponse.status()).toBe(404);
 
-  await page.getByTestId("login-name-input").fill(e2eUserName);
-  await page.getByTestId("login-password-input").fill("wrong-password");
-  await page.getByTestId("login-submit").click();
-  await expect(page.getByText("姓名或密码错误")).toBeVisible();
+  const failedLoginResponse = await page.request.post("/api/auth/login", {
+    headers: {
+      "x-forwarded-for": "198.51.100.10",
+    },
+    data: {
+      name: e2eUserName,
+      password: "wrong-password",
+    },
+  });
+  expect(failedLoginResponse.status()).toBe(400);
+  await expect(failedLoginResponse.json()).resolves.toMatchObject({
+    error: "姓名或密码错误",
+  });
 });
 
 test("login locks the current ip after repeated failed attempts", async ({ page }) => {
-  await page.goto("/login");
+  const lockedIp = "198.51.100.11";
 
   for (let i = 1; i < loginLockMaxFailedAttempts; i += 1) {
-    await page.getByTestId("login-name-input").fill(e2eUserName);
-    await page.getByTestId("login-password-input").fill(`wrong-password-${i}`);
-    await page.getByTestId("login-submit").click();
-    await expect(page.getByText("姓名或密码错误")).toBeVisible();
+    const response = await page.request.post("/api/auth/login", {
+      headers: {
+        "x-forwarded-for": lockedIp,
+      },
+      data: {
+        name: e2eUserName,
+        password: `wrong-password-${i}`,
+      },
+    });
+    expect(response.status()).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "姓名或密码错误",
+    });
   }
 
-  await page.getByTestId("login-name-input").fill(e2eUserName);
-  await page.getByTestId("login-password-input").fill(`wrong-password-${loginLockMaxFailedAttempts}`);
-  await page.getByTestId("login-submit").click();
-  await expect(
-    page.getByText(`当前网络尝试过多，请 ${loginLockDurationMinutes} 分钟后再试`)
-  ).toBeVisible();
+  const lockedResponse = await page.request.post("/api/auth/login", {
+    headers: {
+      "x-forwarded-for": lockedIp,
+    },
+    data: {
+      name: e2eUserName,
+      password: `wrong-password-${loginLockMaxFailedAttempts}`,
+    },
+  });
+  expect(lockedResponse.status()).toBe(429);
+  await expect(lockedResponse.json()).resolves.toMatchObject({
+    error: `当前网络尝试过多，请 ${loginLockDurationMinutes} 分钟后再试`,
+  });
 
-  await page.getByTestId("login-password-input").fill(loginPassword);
-  await page.getByTestId("login-submit").click();
-  await expect(
-    page.getByText(`当前网络尝试过多，请 ${loginLockDurationMinutes} 分钟后再试`)
-  ).toBeVisible();
+  const blockedCorrectPasswordResponse = await page.request.post("/api/auth/login", {
+    headers: {
+      "x-forwarded-for": lockedIp,
+    },
+    data: {
+      name: e2eUserName,
+      password: loginPassword,
+    },
+  });
+  expect(blockedCorrectPasswordResponse.status()).toBe(429);
+  await expect(blockedCorrectPasswordResponse.json()).resolves.toMatchObject({
+    error: `当前网络尝试过多，请 ${loginLockDurationMinutes} 分钟后再试`,
+  });
 });
 
 test("user can login and logout repeatedly", async ({ page }) => {
@@ -249,27 +298,41 @@ test("all main page navigations work", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("user can repeatedly sign up and cancel next week's lunch", async ({ page }) => {
+test("user can adjust next week's lunch quantity and cancel it later", async ({ page }) => {
   await login(page);
   const targetDate = nextWeekMondayIsoDate();
-  const mealCard = await openMealCard(page, targetDate, "next");
-  await expect(page.getByTestId(`home-meal-${targetDate}-lunch-status-note`)).toContainText("还能改回");
+  await openMealCard(page, targetDate, "next");
+  await expect(page.getByTestId(`home-meal-${targetDate}-lunch-status-note`)).toContainText("请选择 1 份或多份");
 
-  const cancelButton = mealCard.getByRole("button", { name: /不吃了/ });
-  if (await cancelButton.isVisible().catch(() => false)) {
-    await cancelButton.click();
-    await expect(mealCard.getByRole("button", { name: /吃$/ })).toBeVisible();
-  }
+  await ensureMealQuantity(page, targetDate, "lunch", 0);
+  await page.reload();
 
-  for (let i = 0; i < 2; i += 1) {
-    await mealCard.getByRole("button", { name: /吃$/ }).click();
-    await expect(mealCard.getByRole("button", { name: /不吃了/ })).toBeVisible();
-    await expect(page.getByTestId(`home-meal-${targetDate}-lunch-status-note`)).toContainText("可以点“不吃了”取消");
+  const refreshedMealCard = await openMealCard(page, targetDate, "next");
+  const baselineTotal = await readMealTotalQuantity(refreshedMealCard);
 
-    await mealCard.getByRole("button", { name: /不吃了/ }).click();
-    await expect(mealCard.getByRole("button", { name: /吃$/ })).toBeVisible();
-    await expect(page.getByTestId(`home-meal-${targetDate}-lunch-status-note`)).toContainText("还能改回");
-  }
+  await setMealQuantity(refreshedMealCard, 2);
+  await confirmMealQuantity(refreshedMealCard);
+  await expect(refreshedMealCard.locator('button[data-testid$="-cancel"]')).toBeVisible();
+  await expect(refreshedMealCard.locator('input[data-testid$="-quantity-input"]')).toHaveValue("2");
+  await expect(refreshedMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
+    String(baselineTotal + 2)
+  );
+  await expect(refreshedMealCard).toContainText(`${e2eUserName} × 2`);
+  await expect(page.getByTestId(`home-meal-${targetDate}-lunch-status-note`)).toContainText("你当前已点 2 份");
+
+  await setMealQuantity(refreshedMealCard, 3);
+  await confirmMealQuantity(refreshedMealCard);
+  await expect(refreshedMealCard.locator('input[data-testid$="-quantity-input"]')).toHaveValue("3");
+  await expect(refreshedMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
+    String(baselineTotal + 3)
+  );
+  await expect(refreshedMealCard).toContainText(`${e2eUserName} × 3`);
+
+  await refreshedMealCard.locator('button[data-testid$="-cancel"]').click();
+  await expect(refreshedMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
+    String(baselineTotal)
+  );
+  await expect(refreshedMealCard).not.toContainText(`${e2eUserName} × 3`);
 });
 
 test("admin page requires password before menu management is shown", async ({ page }) => {
@@ -317,27 +380,25 @@ test("signup data persists after reload and re-login", async ({ page }) => {
   await login(page);
   const targetDate = nextWeekMondayIsoDate();
 
-  let mealCard = await openMealCard(page, targetDate, "next");
-  const cancelButton = mealCard.getByRole("button", { name: /不吃了/ });
-  if (await cancelButton.isVisible().catch(() => false)) {
-    await cancelButton.click();
-    await expect(mealCard.getByRole("button", { name: /吃$/ })).toBeVisible();
-  }
-
-  await mealCard.getByRole("button", { name: /吃$/ }).click();
-  await expect(mealCard.getByRole("button", { name: /不吃了/ })).toBeVisible();
+  await ensureMealQuantity(page, targetDate, "lunch", 0);
+  let mealCard = await ensureMealQuantity(page, targetDate, "lunch", 2);
+  await expect(mealCard.locator('button[data-testid$="-cancel"]')).toBeVisible();
 
   await page.reload();
   mealCard = await openMealCard(page, targetDate, "next");
-  await expect(mealCard.getByRole("button", { name: /不吃了/ })).toBeVisible();
+  await expect(mealCard.locator('button[data-testid$="-cancel"]')).toBeVisible();
+  await expect(mealCard.locator('input[data-testid$="-quantity-input"]')).toHaveValue("2");
+  await expect(mealCard).toContainText(`${e2eUserName} × 2`);
 
   await logout(page);
   await login(page);
   mealCard = await openMealCard(page, targetDate, "next");
-  await expect(mealCard.getByRole("button", { name: /不吃了/ })).toBeVisible();
+  await expect(mealCard.locator('button[data-testid$="-cancel"]')).toBeVisible();
+  await expect(mealCard.locator('input[data-testid$="-quantity-input"]')).toHaveValue("2");
 
-  await mealCard.getByRole("button", { name: /不吃了/ }).click();
-  await expect(mealCard.getByRole("button", { name: /吃$/ })).toBeVisible();
+  await mealCard.locator('button[data-testid$="-cancel"]').click();
+  await expect(mealCard.locator('button[data-testid$="-confirm"]')).toBeVisible();
+  await expect(mealCard).not.toContainText(`${e2eUserName} × 2`);
 });
 
 test("guest can browse suggestions but must login before signing up", async ({ page }) => {
@@ -378,32 +439,43 @@ test("two users see consistent signup counts and attendee names", async ({ brows
     await login(firstPage, e2eUserName);
     await login(secondPage, e2eSecondUserName);
 
-    await ensureSignupState(firstPage, targetDate, "dinner", false);
-    await ensureSignupState(secondPage, targetDate, "dinner", false);
+    await ensureMealQuantity(firstPage, targetDate, "dinner", 0);
+    await ensureMealQuantity(secondPage, targetDate, "dinner", 0);
 
-    let firstMealCard = await ensureSignupState(firstPage, targetDate, "dinner", true);
-    await expect(firstMealCard).toContainText("1 人");
+    let firstMealCard = await openMealCard(firstPage, targetDate, "next", "dinner");
+    const baselineTotal = await readMealTotalQuantity(firstMealCard);
+
+    firstMealCard = await ensureMealQuantity(firstPage, targetDate, "dinner", 1);
+    await expect(firstMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
+      String(baselineTotal + 1)
+    );
     await expect(firstMealCard).toContainText(e2eUserName);
 
     let secondMealCard = await openMealCard(secondPage, targetDate, "next", "dinner");
     await secondPage.reload();
     secondMealCard = await openMealCard(secondPage, targetDate, "next", "dinner");
-    await expect(secondMealCard).toContainText("1 人");
+    await expect(secondMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
+      String(baselineTotal + 1)
+    );
     await expect(secondMealCard).toContainText(e2eUserName);
 
-    secondMealCard = await ensureSignupState(secondPage, targetDate, "dinner", true);
-    await expect(secondMealCard).toContainText("2 人");
+    secondMealCard = await ensureMealQuantity(secondPage, targetDate, "dinner", 2);
+    await expect(secondMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
+      String(baselineTotal + 3)
+    );
     await expect(secondMealCard).toContainText(e2eUserName);
-    await expect(secondMealCard).toContainText(e2eSecondUserName);
+    await expect(secondMealCard).toContainText(`${e2eSecondUserName} × 2`);
 
     await firstPage.reload();
     firstMealCard = await openMealCard(firstPage, targetDate, "next", "dinner");
-    await expect(firstMealCard).toContainText("2 人");
+    await expect(firstMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
+      String(baselineTotal + 3)
+    );
     await expect(firstMealCard).toContainText(e2eUserName);
-    await expect(firstMealCard).toContainText(e2eSecondUserName);
+    await expect(firstMealCard).toContainText(`${e2eSecondUserName} × 2`);
   } finally {
-    await ensureSignupState(firstPage, targetDate, "dinner", false).catch(() => {});
-    await ensureSignupState(secondPage, targetDate, "dinner", false).catch(() => {});
+    await ensureMealQuantity(firstPage, targetDate, "dinner", 0).catch(() => {});
+    await ensureMealQuantity(secondPage, targetDate, "dinner", 0).catch(() => {});
     await firstContext.close();
     await secondContext.close();
   }
