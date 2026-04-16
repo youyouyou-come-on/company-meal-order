@@ -2,8 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 
-const MAX_FAILED_ATTEMPTS = 10;
-const LOCK_DURATION_MINUTES = 15;
+function getPositiveIntegerEnv(name: string, fallback: number) {
+  const rawValue = process.env[name];
+  if (!rawValue) return fallback;
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
+
+  return parsed;
+}
+
+const MAX_FAILED_ATTEMPTS = getPositiveIntegerEnv(
+  "LOGIN_LOCK_MAX_FAILED_ATTEMPTS",
+  100
+);
+const LOCK_DURATION_MINUTES = getPositiveIntegerEnv(
+  "LOGIN_LOCK_DURATION_MINUTES",
+  15
+);
 
 function getClientIp(request: NextRequest) {
   const forwardedFor = request.headers.get("x-forwarded-for");
@@ -50,7 +66,11 @@ export async function POST(request: NextRequest) {
       where: { ip: clientIp },
     });
 
-    if (throttle?.lockedUntil && throttle.lockedUntil > now) {
+    if (
+      throttle?.lockedUntil &&
+      throttle.failedCount >= MAX_FAILED_ATTEMPTS &&
+      throttle.lockedUntil > now
+    ) {
       return NextResponse.json(
         { error: getLockedMessage() },
         { status: 429 }

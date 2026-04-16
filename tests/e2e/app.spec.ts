@@ -2,6 +2,14 @@ import { expect, test, type Page } from "@playwright/test";
 
 const adminPassword = process.env.ADMIN_PASSWORD ?? "";
 const loginPassword = process.env.LOGIN_PASSWORD ?? "hzzcgc";
+const loginLockMaxFailedAttempts = Number.parseInt(
+  process.env.LOGIN_LOCK_MAX_FAILED_ATTEMPTS ?? "10",
+  10
+);
+const loginLockDurationMinutes = Number.parseInt(
+  process.env.LOGIN_LOCK_DURATION_MINUTES ?? "15",
+  10
+);
 const e2eUserName = "张英俊";
 const e2eSecondUserName = "杜平花";
 type MealType = "lunch" | "dinner";
@@ -166,10 +174,10 @@ test("login does not expose employee list and requires the shared password", asy
   await expect(page.getByText("姓名或密码错误")).toBeVisible();
 });
 
-test("login locks the current ip for 15 minutes after 10 failed attempts", async ({ page }) => {
+test("login locks the current ip after repeated failed attempts", async ({ page }) => {
   await page.goto("/login");
 
-  for (let i = 1; i <= 9; i += 1) {
+  for (let i = 1; i < loginLockMaxFailedAttempts; i += 1) {
     await page.getByTestId("login-name-input").fill(e2eUserName);
     await page.getByTestId("login-password-input").fill(`wrong-password-${i}`);
     await page.getByTestId("login-submit").click();
@@ -177,13 +185,17 @@ test("login locks the current ip for 15 minutes after 10 failed attempts", async
   }
 
   await page.getByTestId("login-name-input").fill(e2eUserName);
-  await page.getByTestId("login-password-input").fill("wrong-password-10");
+  await page.getByTestId("login-password-input").fill(`wrong-password-${loginLockMaxFailedAttempts}`);
   await page.getByTestId("login-submit").click();
-  await expect(page.getByText("当前网络尝试过多，请 15 分钟后再试")).toBeVisible();
+  await expect(
+    page.getByText(`当前网络尝试过多，请 ${loginLockDurationMinutes} 分钟后再试`)
+  ).toBeVisible();
 
   await page.getByTestId("login-password-input").fill(loginPassword);
   await page.getByTestId("login-submit").click();
-  await expect(page.getByText("当前网络尝试过多，请 15 分钟后再试")).toBeVisible();
+  await expect(
+    page.getByText(`当前网络尝试过多，请 ${loginLockDurationMinutes} 分钟后再试`)
+  ).toBeVisible();
 });
 
 test("user can login and logout repeatedly", async ({ page }) => {

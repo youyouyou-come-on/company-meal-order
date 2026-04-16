@@ -84,6 +84,8 @@ source ./deploy-remote.env
 - `DEPLOY_PATH`：远程部署目录
 - `SESSION_PASSWORD`：首次部署时必填
 - `LOGIN_PASSWORD`：员工登录统一密码，首次部署时必填
+- `LOGIN_LOCK_MAX_FAILED_ATTEMPTS`：同一 IP 连续错误多少次后锁定，默认 100
+- `LOGIN_LOCK_DURATION_MINUTES`：锁定时长（分钟），默认 15
 - `ADMIN_PASSWORD`：首次部署时必填
 - `APP_DOMAINS`：域名列表，多个域名用空格分隔
 - `ENABLE_HTTPS=1`：自动申请 HTTPS
@@ -97,6 +99,8 @@ source ./deploy-remote.env
 | `DATABASE_URL` | SQLite 数据库路径 | `file:./prod.db` |
 | `SESSION_PASSWORD` | Session 加密密钥（≥32 字符） | 无，必须设置 |
 | `LOGIN_PASSWORD` | 员工登录统一密码 | 无，必须设置 |
+| `LOGIN_LOCK_MAX_FAILED_ATTEMPTS` | 同一 IP 连续登录错误多少次后锁定 | `100` |
+| `LOGIN_LOCK_DURATION_MINUTES` | 登录锁定时长（分钟） | `15` |
 | `ADMIN_PASSWORD` | 管理后台密码 | `123456` |
 | `COOKIE_SECURE` | HTTPS 时设为 `true` | `false` |
 

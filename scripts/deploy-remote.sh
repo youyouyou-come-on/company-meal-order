@@ -20,6 +20,8 @@ APP_DOMAINS="${APP_DOMAINS:-}"
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
 SESSION_PASSWORD="${SESSION_PASSWORD:-}"
 LOGIN_PASSWORD="${LOGIN_PASSWORD:-}"
+LOGIN_LOCK_MAX_FAILED_ATTEMPTS="${LOGIN_LOCK_MAX_FAILED_ATTEMPTS:-}"
+LOGIN_LOCK_DURATION_MINUTES="${LOGIN_LOCK_DURATION_MINUTES:-}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 COOKIE_SECURE="${COOKIE_SECURE:-}"
 SEED_ON_FIRST_DEPLOY="${SEED_ON_FIRST_DEPLOY:-1}"
@@ -43,6 +45,8 @@ usage() {
   PNPM_VERSION           pnpm 版本，默认 10.29.3
   SESSION_PASSWORD       首次部署时必须提供；后续部署不填则沿用远程 .env
   LOGIN_PASSWORD         首次部署时必须提供；后续部署不填则沿用远程 .env
+  LOGIN_LOCK_MAX_FAILED_ATTEMPTS  可选；同一 IP 连续错误多少次后锁定，默认 100
+  LOGIN_LOCK_DURATION_MINUTES     可选；锁定时长（分钟），默认 15
   ADMIN_PASSWORD         首次部署时必须提供；后续部署不填则沿用远程 .env
   INSTALL_NGINX          是否安装并配置 Nginx，默认 1
   APP_DOMAINS            域名列表，多个域名用空格分隔，例如 "zcgc.club www.zcgc.club"
@@ -146,6 +150,8 @@ APP_DOMAINS_B64=$(encode_b64 "$APP_DOMAINS")
 CERTBOT_EMAIL_B64=$(encode_b64 "$CERTBOT_EMAIL")
 SESSION_PASSWORD_B64=$(encode_b64 "$SESSION_PASSWORD")
 LOGIN_PASSWORD_B64=$(encode_b64 "$LOGIN_PASSWORD")
+LOGIN_LOCK_MAX_FAILED_ATTEMPTS_B64=$(encode_b64 "$LOGIN_LOCK_MAX_FAILED_ATTEMPTS")
+LOGIN_LOCK_DURATION_MINUTES_B64=$(encode_b64 "$LOGIN_LOCK_DURATION_MINUTES")
 ADMIN_PASSWORD_B64=$(encode_b64 "$ADMIN_PASSWORD")
 COOKIE_SECURE_B64=$(encode_b64 "$COOKIE_SECURE")
 SEED_ON_FIRST_DEPLOY=$SEED_ON_FIRST_DEPLOY
@@ -218,6 +224,8 @@ app_domains="$(decode_b64 "$APP_DOMAINS_B64")"
 certbot_email="$(decode_b64 "$CERTBOT_EMAIL_B64")"
 session_password_input="$(decode_b64 "$SESSION_PASSWORD_B64")"
 login_password_input="$(decode_b64 "$LOGIN_PASSWORD_B64")"
+login_lock_max_failed_attempts_input="$(decode_b64 "$LOGIN_LOCK_MAX_FAILED_ATTEMPTS_B64")"
+login_lock_duration_minutes_input="$(decode_b64 "$LOGIN_LOCK_DURATION_MINUTES_B64")"
 admin_password_input="$(decode_b64 "$ADMIN_PASSWORD_B64")"
 cookie_secure_input="$(decode_b64 "$COOKIE_SECURE_B64")"
 
@@ -263,11 +271,15 @@ chown -R "$app_user:$app_user" "$deploy_path" "/home/${app_user}"
 
 existing_session_password="$(read_env_value SESSION_PASSWORD "$env_file")"
 existing_login_password="$(read_env_value LOGIN_PASSWORD "$env_file")"
+existing_login_lock_max_failed_attempts="$(read_env_value LOGIN_LOCK_MAX_FAILED_ATTEMPTS "$env_file")"
+existing_login_lock_duration_minutes="$(read_env_value LOGIN_LOCK_DURATION_MINUTES "$env_file")"
 existing_admin_password="$(read_env_value ADMIN_PASSWORD "$env_file")"
 existing_cookie_secure="$(read_env_value COOKIE_SECURE "$env_file")"
 
 session_password="${session_password_input:-$existing_session_password}"
 login_password="${login_password_input:-$existing_login_password}"
+login_lock_max_failed_attempts="${login_lock_max_failed_attempts_input:-$existing_login_lock_max_failed_attempts}"
+login_lock_duration_minutes="${login_lock_duration_minutes_input:-$existing_login_lock_duration_minutes}"
 admin_password="${admin_password_input:-$existing_admin_password}"
 cookie_secure="${cookie_secure_input:-$existing_cookie_secure}"
 
@@ -292,11 +304,17 @@ fi
 
 {
   if [[ -f "$env_file" ]]; then
-    grep -Ev '^(DATABASE_URL|SESSION_PASSWORD|LOGIN_PASSWORD|ADMIN_PASSWORD|COOKIE_SECURE|NODE_ENV|NEXT_TELEMETRY_DISABLED)=' "$env_file" || true
+    grep -Ev '^(DATABASE_URL|SESSION_PASSWORD|LOGIN_PASSWORD|LOGIN_LOCK_MAX_FAILED_ATTEMPTS|LOGIN_LOCK_DURATION_MINUTES|ADMIN_PASSWORD|COOKIE_SECURE|NODE_ENV|NEXT_TELEMETRY_DISABLED)=' "$env_file" || true
   fi
   printf 'DATABASE_URL="file:./prod.db"\n'
   printf 'SESSION_PASSWORD="%s"\n' "$session_password"
   printf 'LOGIN_PASSWORD="%s"\n' "$login_password"
+  if [[ -n "$login_lock_max_failed_attempts" ]]; then
+    printf 'LOGIN_LOCK_MAX_FAILED_ATTEMPTS="%s"\n' "$login_lock_max_failed_attempts"
+  fi
+  if [[ -n "$login_lock_duration_minutes" ]]; then
+    printf 'LOGIN_LOCK_DURATION_MINUTES="%s"\n' "$login_lock_duration_minutes"
+  fi
   printf 'ADMIN_PASSWORD="%s"\n' "$admin_password"
   printf 'COOKIE_SECURE="%s"\n' "$cookie_secure"
   printf 'NODE_ENV="production"\n'
