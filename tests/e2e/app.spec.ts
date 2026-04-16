@@ -30,6 +30,18 @@ function currentSelectableDate() {
   return todayIsoDate();
 }
 
+function currentWeekPastDate() {
+  const now = new Date();
+  const day = now.getUTCDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday)
+  );
+  const mondayStr = monday.toISOString().split("T")[0];
+
+  return mondayStr < todayIsoDate() ? mondayStr : null;
+}
+
 function nextWeekMondayIsoDate() {
   const now = new Date();
   const day = now.getUTCDay();
@@ -176,6 +188,15 @@ test("user can login and view current meal cards", async ({ page }) => {
   await expect(page.getByText("当天合计")).not.toBeVisible();
   await expect(page.getByRole("link", { name: "建议专区" })).toBeVisible();
   await expect(page.getByRole("link", { name: "管理菜单" })).toBeVisible();
+});
+
+test("past dates are marked as expired instead of available", async ({ page }) => {
+  const expiredDate = currentWeekPastDate();
+  test.skip(!expiredDate, "当前周没有已过期日期可验证。");
+
+  await login(page, e2eUserName);
+  await expect(page.getByTestId(`home-day-tab-${expiredDate}`)).toContainText("已过期");
+  await expect(page.getByTestId(`home-day-tab-${expiredDate}`)).not.toContainText("可点餐日");
 });
 
 test("login does not expose employee list and requires the shared password", async ({ page }) => {

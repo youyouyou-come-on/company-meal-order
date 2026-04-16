@@ -77,6 +77,10 @@ function isExpiredClient(dateStr: string, mealType: MealType): boolean {
   return chinaHour >= cutoffHour;
 }
 
+function isDayExpired(dateStr: string) {
+  return isExpiredClient(dateStr, "dinner");
+}
+
 function slotKey(date: string, mealType: MealType) {
   return `${date}-${mealType}`;
 }
@@ -330,6 +334,7 @@ export default function Home() {
             const { dayLabel, shortDate } = formatDateLabel(date);
             const isToday = date === today;
             const isSelected = date === selectedDate;
+            const isExpiredDay = isDayExpired(date);
             return (
               <button
                 type="button"
@@ -339,17 +344,35 @@ export default function Home() {
                 className={`rounded-2xl border px-3 py-3 text-center shadow-sm transition-all print:shadow-none ${
                   isSelected
                     ? "border-amber-500 bg-amber-500 text-white"
-                    : isToday
+                    : isExpiredDay
+                      ? "border-gray-200 bg-gray-100 text-gray-400"
+                      : isToday
                       ? "border-amber-400 bg-amber-100"
                       : "border-orange-100 bg-white"
                 }`}
               >
-                <div className={`text-sm font-bold ${isSelected ? "text-white" : "text-gray-700"}`}>{dayLabel}</div>
-                <div className={`mt-1 text-2xl font-extrabold leading-none ${isSelected ? "text-white" : "text-gray-900"}`}>{shortDate}</div>
+                <div
+                  className={`text-sm font-bold ${
+                    isSelected ? "text-white" : isExpiredDay ? "text-gray-500" : "text-gray-700"
+                  }`}
+                >
+                  {dayLabel}
+                </div>
+                <div
+                  className={`mt-1 text-2xl font-extrabold leading-none ${
+                    isSelected ? "text-white" : isExpiredDay ? "text-gray-600" : "text-gray-900"
+                  }`}
+                >
+                  {shortDate}
+                </div>
                 <div className="mt-2">
                   {isSelected ? (
                     <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold text-white">
                       已选择
+                    </span>
+                  ) : isExpiredDay ? (
+                    <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-bold text-gray-600">
+                      已过期
                     </span>
                   ) : isToday ? (
                     <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
