@@ -327,6 +327,14 @@ test("user can adjust next week's lunch quantity and cancel it later", async ({ 
   await expect(refreshedMealCard).toContainText(`${e2eUserName} × 2`);
   await expect(page.getByTestId(`home-meal-${targetDate}-lunch-status-note`)).toContainText("你当前已点 2 份");
 
+  await page.getByTestId(`home-selected-day-summary-${targetDate}-lunch`).click();
+  await expect(page.getByTestId("home-summary-modal")).toBeVisible();
+  await expect(page.getByTestId("home-summary-modal")).toContainText("午餐点餐名单");
+  await expect(page.getByTestId("home-summary-modal")).toContainText(e2eUserName);
+  await expect(page.getByTestId("home-summary-modal")).toContainText("2 份");
+  await page.getByTestId("home-summary-modal-close").click();
+  await expect(page.getByTestId("home-summary-modal")).not.toBeVisible();
+
   await setMealQuantity(refreshedMealCard, 3);
   await confirmMealQuantity(refreshedMealCard);
   await expect(refreshedMealCard.locator('input[data-testid$="-quantity-input"]')).toHaveValue("3");

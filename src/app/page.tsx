@@ -20,6 +20,10 @@ interface Signup {
 type MealType = "lunch" | "dinner";
 type SignupMap = Record<string, Signup[]>;
 type QuantityDraftMap = Record<string, number>;
+type SummaryModalState = {
+  mealType: MealType;
+  title: string;
+} | null;
 
 const DAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const MIN_MEAL_QUANTITY = 1;
@@ -107,6 +111,7 @@ export default function Home() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [signupsBySlot, setSignupsBySlot] = useState<SignupMap>({});
   const [quantityDrafts, setQuantityDrafts] = useState<QuantityDraftMap>({});
+  const [summaryModal, setSummaryModal] = useState<SummaryModalState>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const signupRequestVersionRef = useRef<Record<string, number>>({});
 
@@ -262,6 +267,10 @@ export default function Home() {
   else if (chinaHour < 18) greeting = "下午好 🌅";
   else greeting = "晚上好 🌙";
 
+  const summaryModalSignups = summaryModal
+    ? getSignups(selectedDate, summaryModal.mealType)
+    : [];
+
   return (
     <div className="min-h-screen bg-orange-50/30 print:bg-white">
       <main className="mx-auto max-w-5xl px-4 py-5 sm:px-6 print:max-w-none print:px-3 print:py-3">
@@ -372,24 +381,34 @@ export default function Home() {
             data-testid={`home-selected-day-summary-${selectedDate}`}
             className="mb-4 grid gap-3 sm:grid-cols-2"
           >
-            <div
+            <button
+              type="button"
               data-testid={`home-selected-day-summary-${selectedDate}-lunch`}
-              className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3"
+              onClick={() => setSummaryModal({ mealType: "lunch", title: "午餐" })}
+              className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-left transition-colors hover:bg-orange-100"
             >
-              <div className="text-xs font-semibold tracking-wide text-amber-700">午餐总份数</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs font-semibold tracking-wide text-amber-700">午餐总份数</div>
+                <span className="text-xs font-medium text-gray-400">点击查看名单</span>
+              </div>
               <div className="mt-1 text-3xl font-extrabold leading-none text-gray-900">
                 {selectedLunchTotal}
               </div>
-            </div>
-            <div
+            </button>
+            <button
+              type="button"
               data-testid={`home-selected-day-summary-${selectedDate}-dinner`}
-              className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3"
+              onClick={() => setSummaryModal({ mealType: "dinner", title: "晚餐" })}
+              className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-left transition-colors hover:bg-orange-100"
             >
-              <div className="text-xs font-semibold tracking-wide text-amber-700">晚餐总份数</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs font-semibold tracking-wide text-amber-700">晚餐总份数</div>
+                <span className="text-xs font-medium text-gray-400">点击查看名单</span>
+              </div>
               <div className="mt-1 text-3xl font-extrabold leading-none text-gray-900">
                 {selectedDinnerTotal}
               </div>
-            </div>
+            </button>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -434,6 +453,63 @@ export default function Home() {
           </div>
         </section>
       </main>
+
+      {summaryModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 px-4"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="summary-modal-title"
+            data-testid="home-summary-modal"
+            className="w-full max-w-md rounded-3xl bg-white shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-orange-100 px-5 py-4">
+              <div>
+                <h3
+                  id="summary-modal-title"
+                  className="text-xl font-extrabold text-gray-900"
+                >
+                  {summaryModal.title}点餐名单
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {selectedDateLabel.dayLabel} {selectedDateLabel.shortDate}
+                </p>
+              </div>
+              <button
+                type="button"
+                data-testid="home-summary-modal-close"
+                onClick={() => setSummaryModal(null)}
+                className="rounded-full bg-orange-50 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-orange-100"
+              >
+                关闭
+              </button>
+            </div>
+
+            <div
+              data-testid="home-summary-modal-list"
+              className="max-h-[60vh] overflow-y-auto px-5 py-4"
+            >
+              {summaryModalSignups.length > 0 ? (
+                <div className="space-y-3">
+                  {summaryModalSignups.map((signup) => (
+                    <div
+                      key={`summary-${selectedDate}-${summaryModal.mealType}-${signup.id}`}
+                      className="flex items-center justify-between rounded-2xl border border-orange-100 bg-orange-50/60 px-4 py-3"
+                    >
+                      <span className="font-semibold text-gray-900">{signup.userName}</span>
+                      <span className="text-sm font-bold text-amber-700">{signup.quantity} 份</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-10 text-center text-sm text-gray-400">还没有人点餐</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
