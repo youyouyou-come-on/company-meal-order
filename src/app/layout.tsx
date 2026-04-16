@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "公司点餐系统",
-  description: "公司内部点餐系统",
+  title: "广众&众创内部点餐系统",
+  description: "广众与众创内部点餐系统",
 };
 
 export default function RootLayout({

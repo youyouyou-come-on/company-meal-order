@@ -47,15 +47,18 @@ export default function Navbar() {
   return (
     <nav className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-orange-100">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-14 items-center justify-between">
-          <Link
-            href="/"
-            className="text-lg font-bold text-amber-600 hover:text-amber-700"
-          >
-            🍽️ 公司点餐
-          </Link>
+        <div className="flex min-h-14 items-center justify-between gap-3 py-2">
+          <div className="text-base font-bold leading-tight text-amber-700 sm:text-lg">
+            🍽️ 广众&众创内部点餐系统
+          </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+            <Link
+              href="/"
+              className="rounded-md bg-amber-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-600"
+            >
+              点餐
+            </Link>
             <Link
               href="/suggestions"
               className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-amber-50 hover:text-amber-800"

@@ -52,7 +52,7 @@ function getMondayFromDate(dateStr: string) {
 
 async function login(page: Page, userName = e2eUserName) {
   await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "公司点餐系统" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "广众&众创内部点餐系统" })).toBeVisible();
   await page.getByTestId("login-name-input").fill(userName);
   await page.getByTestId("login-password-input").fill(loginPassword);
   await page.getByTestId("login-submit").click();
@@ -63,7 +63,7 @@ async function login(page: Page, userName = e2eUserName) {
 async function logout(page: Page) {
   await page.getByRole("button", { name: "退出" }).click();
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole("heading", { name: "公司点餐系统" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "广众&众创内部点餐系统" })).toBeVisible();
 }
 
 async function openMealCard(
@@ -293,7 +293,7 @@ test("all main page navigations work", async ({ page }) => {
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByText("管理员验证")).toBeVisible();
 
-  await page.getByRole("link", { name: "🍽️ 公司点餐" }).click();
+  await page.getByRole("link", { name: "点餐" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("button", { name: "下周点餐" })).toBeVisible();
 

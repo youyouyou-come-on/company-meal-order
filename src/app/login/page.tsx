@@ -40,7 +40,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-lg border border-orange-100">
         <div className="mb-6 text-center">
           <div className="text-5xl mb-3">🍽️</div>
-          <h1 className="text-2xl font-bold text-gray-800">公司点餐系统</h1>
+          <h1 className="text-2xl font-bold text-gray-800">广众&众创内部点餐系统</h1>
           <p className="mt-1 text-sm text-amber-600">输入姓名和公共密码后进入点餐</p>
         </div>
 
