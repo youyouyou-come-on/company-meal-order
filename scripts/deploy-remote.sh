@@ -25,6 +25,7 @@ LOGIN_LOCK_DURATION_MINUTES="${LOGIN_LOCK_DURATION_MINUTES:-}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 COOKIE_SECURE="${COOKIE_SECURE:-}"
 SEED_ON_FIRST_DEPLOY="${SEED_ON_FIRST_DEPLOY:-1}"
+FORCE_DB_SEED="${FORCE_DB_SEED:-0}"
 
 usage() {
   cat <<'EOF'
@@ -54,6 +55,7 @@ usage() {
   CERTBOT_EMAIL          Certbot 邮箱；不填则使用无邮箱注册模式
   COOKIE_SECURE          是否把 Cookie 设为 secure；默认会随 ENABLE_HTTPS 自动推断
   SEED_ON_FIRST_DEPLOY   首次部署时是否执行 seed，默认 1
+  FORCE_DB_SEED         是否在当前部署中强制执行 seed，默认 0
 
 说明：
   1. 该脚本默认面向 Ubuntu / Debian，并要求使用 root SSH 登录。
@@ -155,6 +157,7 @@ LOGIN_LOCK_DURATION_MINUTES_B64=$(encode_b64 "$LOGIN_LOCK_DURATION_MINUTES")
 ADMIN_PASSWORD_B64=$(encode_b64 "$ADMIN_PASSWORD")
 COOKIE_SECURE_B64=$(encode_b64 "$COOKIE_SECURE")
 SEED_ON_FIRST_DEPLOY=$SEED_ON_FIRST_DEPLOY
+FORCE_DB_SEED=$FORCE_DB_SEED
 EOF
 
 echo "==> 检查远程基础环境"
@@ -337,7 +340,7 @@ runuser -u "$app_user" -- bash -lc "
   pnpm install --frozen-lockfile
   pnpm exec prisma generate
   pnpm exec prisma db push
-  if [[ '$db_exists_before' == '0' && '$SEED_ON_FIRST_DEPLOY' == '1' ]]; then
+  if [[ ('$db_exists_before' == '0' && '$SEED_ON_FIRST_DEPLOY' == '1') || '$FORCE_DB_SEED' == '1' ]]; then
     pnpm exec prisma db seed
   fi
   pnpm build

@@ -117,6 +117,15 @@ npx prisma studio
 
 编辑 `prisma/seed.ts`，修改姓名列表后执行 `npx prisma db seed`
 
+如果是线上正式员工名单变更，推荐这样同步：
+
+```bash
+source ./deploy-remote.env
+FORCE_DB_SEED=1 ./scripts/deploy-remote.sh
+```
+
+这样会把 `prisma/seed.ts` 里的最新用户名单同步到生产库，不会影响已有点餐记录。
+
 ## 📁 项目结构
 
 ```
