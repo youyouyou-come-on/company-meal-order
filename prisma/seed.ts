@@ -43,6 +43,7 @@ async function main() {
     "王刚",
     "郭丽阳",
     "葛非纠",
+    "卢育胜",
   ];
 
   for (const name of users) {
