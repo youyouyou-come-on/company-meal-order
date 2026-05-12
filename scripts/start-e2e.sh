@@ -25,13 +25,13 @@ else
     "$PRISMA_BIN" generate
   fi
   env \
-    DEBUG="${DEBUG:-prisma:*}" \
+    DEBUG="${DEBUG:-}" \
     RUST_LOG="${RUST_LOG:-info}" \
     PRISMA_SCHEMA_ENGINE_LOG_LEVEL="${PRISMA_SCHEMA_ENGINE_LOG_LEVEL:-trace}" \
     DATABASE_URL="file:./.runtime/e2e.db" \
     "$PRISMA_BIN" db push
   env \
-    DEBUG="${DEBUG:-prisma:*}" \
+    DEBUG="${DEBUG:-}" \
     RUST_LOG="${RUST_LOG:-info}" \
     PRISMA_SCHEMA_ENGINE_LOG_LEVEL="${PRISMA_SCHEMA_ENGINE_LOG_LEVEL:-trace}" \
     DATABASE_URL="file:./.runtime/e2e.db" \
@@ -43,14 +43,14 @@ if [[ ! -f "$ROOT_DIR/src/generated/prisma/client.ts" ]]; then
 fi
 
 env \
-  DEBUG="${DEBUG:-prisma:*}" \
+  DEBUG="${DEBUG:-}" \
   RUST_LOG="${RUST_LOG:-info}" \
   PRISMA_SCHEMA_ENGINE_LOG_LEVEL="${PRISMA_SCHEMA_ENGINE_LOG_LEVEL:-trace}" \
   DATABASE_URL="file:./.runtime/e2e.db" \
   "$PRISMA_BIN" db push
 
 env \
-  DEBUG="${DEBUG:-prisma:*}" \
+  DEBUG="${DEBUG:-}" \
   RUST_LOG="${RUST_LOG:-info}" \
   PRISMA_SCHEMA_ENGINE_LOG_LEVEL="${PRISMA_SCHEMA_ENGINE_LOG_LEVEL:-trace}" \
   DATABASE_URL="file:./.runtime/e2e.db" \

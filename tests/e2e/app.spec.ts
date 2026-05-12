@@ -101,12 +101,17 @@ async function getWeekMenus(page: Page, weekStart?: string) {
 }
 
 async function verifyAdmin(page: Page) {
-  await page.goto("/admin");
-  const passwordInput = page.getByTestId("admin-password-input");
-  if (await passwordInput.isVisible().catch(() => false)) {
-    await passwordInput.fill(adminPassword);
-    await page.getByTestId("admin-password-submit").click();
+  await page.goto("/admin", { waitUntil: "domcontentloaded" });
+  // 管理员状态会在客户端异步恢复，先给页面一次从验证框切到后台内容的机会。
+  await page.waitForTimeout(500);
+  if (await page.getByTestId("admin-week-grid").isVisible().catch(() => false)) {
+    return;
   }
+
+  const passwordInput = page.getByTestId("admin-password-input");
+  await expect(passwordInput).toBeVisible();
+  await passwordInput.fill(adminPassword);
+  await page.getByTestId("admin-password-submit").click();
   await expect(page.getByTestId("admin-week-grid")).toBeVisible();
 }
 
@@ -465,6 +470,59 @@ test("admin verification rejects wrong password and accepts the correct one", as
   await page.getByTestId("admin-password-input").fill(adminPassword);
   await page.getByTestId("admin-password-submit").click();
   await expect(page.getByTestId("admin-week-grid")).toBeVisible();
+});
+
+test("admin can add and disable an employee account", async ({ page, request }) => {
+  test.skip(!adminPassword, "ADMIN_PASSWORD is required for employee management e2e coverage.");
+
+  await login(page);
+  await verifyAdmin(page);
+
+  const employeeName = `E2E员工${Date.now()}`;
+  const employeeRow = () =>
+    page.getByTestId("admin-employee-row").filter({ hasText: employeeName });
+
+  try {
+    await expect(page.getByTestId("admin-employee-panel")).toBeVisible();
+    await page.getByTestId("admin-employee-name-input").fill(employeeName);
+    await page.getByTestId("admin-employee-add").click();
+    await expect(employeeRow()).toBeVisible();
+    await expect(employeeRow()).toContainText("可登录");
+
+    const loginResponse = await request.post("/api/auth/login", {
+      headers: { "x-forwarded-for": `203.0.113.${Date.now() % 200}` },
+      data: { name: employeeName, password: loginPassword },
+    });
+    expect(loginResponse.ok()).toBeTruthy();
+
+    await employeeRow().getByTestId("admin-employee-toggle").click();
+    await expect(employeeRow()).toContainText("已停用");
+
+    const disabledLoginResponse = await request.post("/api/auth/login", {
+      headers: { "x-forwarded-for": `203.0.113.${(Date.now() % 200) + 1}` },
+      data: { name: employeeName, password: loginPassword },
+    });
+    expect(disabledLoginResponse.status()).toBe(400);
+    await expect(disabledLoginResponse.json()).resolves.toMatchObject({
+      error: "姓名或密码错误",
+    });
+
+    await employeeRow().getByTestId("admin-employee-toggle").click();
+    await expect(employeeRow()).toContainText("可登录");
+  } finally {
+    const usersResponse = await page.request.get("/api/admin/users");
+    if (usersResponse.ok()) {
+      const data = await usersResponse.json();
+      const employee = (data.users as Array<{ id: number; name: string }>).find(
+        (item) => item.name === employeeName
+      );
+      if (employee) {
+        await page.request.patch("/api/admin/users", {
+          data: { id: employee.id, isActive: true },
+        });
+      }
+    }
+  }
 });
 
 test("two users see consistent signup counts and attendee names", async ({ browser }) => {

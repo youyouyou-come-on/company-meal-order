@@ -11,6 +11,13 @@ interface Menu {
   dishes: string;
 }
 
+interface Employee {
+  id: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 const DAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
 function getMondayDate(offset: number): Date {
@@ -47,11 +54,18 @@ export default function AdminPage() {
   const router = useRouter();
   const [weekOffset, setWeekOffset] = useState(0);
   const [menus, setMenus] = useState<Menu[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [copyLoading, setCopyLoading] = useState(false);
+  const [newEmployeeName, setNewEmployeeName] = useState("");
+  const [employeeMessage, setEmployeeMessage] = useState("");
+  const [employeeError, setEmployeeError] = useState("");
+  const [employeeSaving, setEmployeeSaving] = useState(false);
+  const [employeeUpdatingId, setEmployeeUpdatingId] = useState<number | null>(null);
 
   // Admin password verification state
   const [adminVerified, setAdminVerified] = useState(false);
@@ -65,6 +79,8 @@ export default function AdminPage() {
   const weekDates = getWeekDates(monday);
   const saturdayDate = weekDates[5];
   const weekLabel = `${weekDates[0]} ~ ${saturdayDate}`;
+  const activeEmployeeCount = employees.filter((employee) => employee.isActive).length;
+  const inactiveEmployeeCount = employees.length - activeEmployeeCount;
 
   function handleDatePick(dateStr: string) {
     const picked = new Date(`${dateStr}T00:00:00.000Z`);
@@ -96,6 +112,19 @@ export default function AdminPage() {
     }
   }, [weekOffset]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const fetchEmployees = useCallback(async () => {
+    setEmployeesLoading(true);
+    try {
+      const res = await fetch("/api/admin/users", { cache: "no-store" });
+      const data = await res.json();
+      setEmployees(data.users || []);
+    } catch {
+      setEmployees([]);
+    } finally {
+      setEmployeesLoading(false);
+    }
+  }, []);
+
   // Check admin verification status on load
   useEffect(() => {
     if (user) {
@@ -117,8 +146,9 @@ export default function AdminPage() {
     }
     if (user && adminVerified) {
       fetchMenus();
+      fetchEmployees();
     }
-  }, [user, userLoading, router, fetchMenus, adminVerified]);
+  }, [user, userLoading, router, fetchMenus, fetchEmployees, adminVerified]);
 
   const handleVerifyPassword = async () => {
     setVerifying(true);
@@ -139,6 +169,61 @@ export default function AdminPage() {
       setVerifyError("验证失败");
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const addEmployee = async () => {
+    const name = newEmployeeName.trim();
+    if (!name) {
+      setEmployeeError("请输入员工姓名");
+      return;
+    }
+
+    setEmployeeSaving(true);
+    setEmployeeMessage("");
+    setEmployeeError("");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmployeeError(data.error || "保存员工失败");
+        return;
+      }
+      setNewEmployeeName("");
+      setEmployeeMessage(data.restored ? "员工已重新启用" : "员工已添加");
+      await fetchEmployees();
+    } catch {
+      setEmployeeError("保存员工失败");
+    } finally {
+      setEmployeeSaving(false);
+    }
+  };
+
+  const toggleEmployee = async (employee: Employee) => {
+    setEmployeeUpdatingId(employee.id);
+    setEmployeeMessage("");
+    setEmployeeError("");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: employee.id, isActive: !employee.isActive }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmployeeError(data.error || "更新员工失败");
+        return;
+      }
+      setEmployeeMessage(data.user.isActive ? "员工已启用" : "员工已停用");
+      await fetchEmployees();
+    } catch {
+      setEmployeeError("更新员工失败");
+    } finally {
+      setEmployeeUpdatingId(null);
     }
   };
 
@@ -359,6 +444,108 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+
+        <section
+          data-testid="admin-employee-panel"
+          className="mb-6 rounded-[28px] border border-stone-200 bg-white p-5 shadow-md print:hidden"
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-black tracking-[0.24em] text-amber-600">EMPLOYEES</p>
+              <h2 className="mt-2 text-2xl font-black text-stone-900">员工管理</h2>
+              <p className="mt-2 text-sm font-semibold text-stone-500">
+                新同事直接在这里添加；离职或误加的员工先停用，历史点餐记录会保留。
+              </p>
+            </div>
+            <div className="flex gap-3 rounded-2xl bg-stone-100 px-4 py-3 text-sm font-black text-stone-700">
+              <span>启用 {activeEmployeeCount} 人</span>
+              <span className="text-stone-400">/</span>
+              <span>停用 {inactiveEmployeeCount} 人</span>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <input
+              value={newEmployeeName}
+              data-testid="admin-employee-name-input"
+              onChange={(e) => setNewEmployeeName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newEmployeeName.trim() && !employeeSaving) {
+                  addEmployee();
+                }
+              }}
+              placeholder="输入员工姓名，如：郭丽阳"
+              className="min-w-0 flex-1 rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-800 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+            <button
+              type="button"
+              data-testid="admin-employee-add"
+              onClick={addEmployee}
+              disabled={employeeSaving || !newEmployeeName.trim()}
+              className="rounded-2xl bg-stone-900 px-5 py-3 text-sm font-black text-white transition-colors hover:bg-stone-700 disabled:opacity-50"
+            >
+              {employeeSaving ? "添加中..." : "添加员工"}
+            </button>
+          </div>
+
+          {employeeMessage && (
+            <p className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+              {employeeMessage}
+            </p>
+          )}
+          {employeeError && (
+            <p className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+              {employeeError}
+            </p>
+          )}
+
+          <div
+            data-testid="admin-employee-list"
+            className="mt-5 grid max-h-[360px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3"
+          >
+            {employeesLoading ? (
+              <p className="text-sm font-semibold text-stone-400">员工加载中...</p>
+            ) : (
+              employees.map((employee) => (
+                <div
+                  key={employee.id}
+                  data-testid="admin-employee-row"
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-stone-900">{employee.name}</div>
+                    <div
+                      className={
+                        employee.isActive
+                          ? "mt-1 text-xs font-bold text-emerald-600"
+                          : "mt-1 text-xs font-bold text-stone-400"
+                      }
+                    >
+                      {employee.isActive ? "可登录" : "已停用"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="admin-employee-toggle"
+                    onClick={() => toggleEmployee(employee)}
+                    disabled={employeeUpdatingId === employee.id}
+                    className={
+                      employee.isActive
+                        ? "shrink-0 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
+                        : "shrink-0 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-600 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                    }
+                  >
+                    {employeeUpdatingId === employee.id
+                      ? "处理中"
+                      : employee.isActive
+                        ? "停用"
+                        : "启用"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
         {/* Weekly layout */}
         {loading ? (

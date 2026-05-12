@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       where: { name: trimmedName },
     });
 
-    if (!user) {
+    if (!user || !user.isActive) {
       const nextFailedCount = (throttle?.failedCount ?? 0) + 1;
       const lockedUntil =
         nextFailedCount >= MAX_FAILED_ATTEMPTS
