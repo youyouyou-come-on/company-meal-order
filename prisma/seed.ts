@@ -49,7 +49,7 @@ async function main() {
   for (const name of users) {
     await prisma.user.upsert({
       where: { name },
-      update: { isActive: true },
+      update: {},
       create: { name, isActive: true },
     });
   }
