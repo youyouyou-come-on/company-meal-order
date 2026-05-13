@@ -88,10 +88,18 @@ async function getWeekMenus(page: Page, weekStart?: string) {
 }
 
 async function verifyAdmin(page: Page) {
-  await page.goto("/admin", { waitUntil: "domcontentloaded" });
+  await verifyAdminRoute(page, "/admin", "admin-week-grid");
+}
+
+async function verifyEmployeeAdmin(page: Page) {
+  await verifyAdminRoute(page, "/employees", "admin-employee-panel");
+}
+
+async function verifyAdminRoute(page: Page, path: string, readyTestId: string) {
+  await page.goto(path, { waitUntil: "domcontentloaded" });
   // 管理员状态会在客户端异步恢复，先给页面一次从验证框切到后台内容的机会。
   await page.waitForTimeout(500);
-  if (await page.getByTestId("admin-week-grid").isVisible().catch(() => false)) {
+  if (await page.getByTestId(readyTestId).isVisible().catch(() => false)) {
     return;
   }
 
@@ -99,7 +107,7 @@ async function verifyAdmin(page: Page) {
   await expect(passwordInput).toBeVisible();
   await passwordInput.fill(adminPassword);
   await page.getByTestId("admin-password-submit").click();
-  await expect(page.getByTestId("admin-week-grid")).toBeVisible();
+  await expect(page.getByTestId(readyTestId)).toBeVisible();
 }
 
 async function setAdminMenuByApi(
@@ -180,6 +188,7 @@ test("user can login and view current meal cards", async ({ page }) => {
   await expect(page.getByText("当天合计")).not.toBeVisible();
   await expect(page.getByRole("link", { name: "建议专区" })).toBeVisible();
   await expect(page.getByRole("link", { name: "管理菜单" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "员工管理" })).toBeVisible();
 });
 
 test("past dates are marked as expired instead of available", async ({ page }) => {
@@ -306,12 +315,18 @@ test("all main page navigations work", async ({ page }) => {
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByText("管理员验证")).toBeVisible();
 
+  await page.getByRole("link", { name: "员工管理" }).click();
+  await expect(page).toHaveURL(/\/employees$/);
+  await expect(page.getByText("管理员验证")).toBeVisible();
+
   await page.getByRole("link", { name: "点餐" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("button", { name: "下周点餐" })).toBeVisible();
 
   await logout(page);
   await page.goto("/admin");
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto("/employees");
   await expect(page).toHaveURL(/\/login$/);
 });
 
@@ -459,11 +474,29 @@ test("admin verification rejects wrong password and accepts the correct one", as
   await expect(page.getByTestId("admin-week-grid")).toBeVisible();
 });
 
+test("employee management route uses the same admin password", async ({ page }) => {
+  test.skip(!adminPassword, "ADMIN_PASSWORD is required for employee management e2e coverage.");
+
+  await login(page);
+  await page.goto("/employees");
+
+  await expect(page.getByText("管理员验证")).toBeVisible();
+  await page.getByTestId("admin-password-input").fill("definitely-wrong-password");
+  await page.getByTestId("admin-password-submit").click();
+  await expect(page.getByText("密码错误")).toBeVisible();
+  await expect(page.getByTestId("admin-employee-panel")).not.toBeVisible();
+
+  await page.getByTestId("admin-password-input").fill(adminPassword);
+  await page.getByTestId("admin-password-submit").click();
+  await expect(page.getByRole("heading", { name: "员工管理" }).first()).toBeVisible();
+  await expect(page.getByTestId("admin-employee-panel")).toBeVisible();
+});
+
 test("admin can add and disable an employee account", async ({ page, request }) => {
   test.skip(!adminPassword, "ADMIN_PASSWORD is required for employee management e2e coverage.");
 
   await login(page);
-  await verifyAdmin(page);
+  await verifyEmployeeAdmin(page);
 
   const employeeName = `E2E员工${Date.now()}`;
   const employeeRow = () =>

@@ -75,6 +75,12 @@ export default function Navbar() {
                 >
                   管理菜单
                 </Link>
+                <Link
+                  href="/employees"
+                  className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-amber-50 hover:text-amber-800"
+                >
+                  员工管理
+                </Link>
                 <span className="text-sm font-medium text-amber-700">{user.name}</span>
                 <button
                   onClick={handleLogout}
