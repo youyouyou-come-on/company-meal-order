@@ -492,6 +492,29 @@ test("employee management route uses the same admin password", async ({ page }) 
   await expect(page.getByTestId("admin-employee-panel")).toBeVisible();
 });
 
+test("employee management can search employees by name", async ({ page }) => {
+  test.skip(!adminPassword, "ADMIN_PASSWORD is required for employee management e2e coverage.");
+
+  await login(page);
+  await verifyEmployeeAdmin(page);
+
+  await expect(page.getByTestId("admin-employee-row").filter({ hasText: "张小龙" })).toBeVisible();
+
+  await page.getByTestId("admin-employee-search-input").fill("张小龙");
+  await expect(page.getByTestId("admin-employee-search-count")).toContainText("显示 1 /");
+  await expect(page.getByTestId("admin-employee-row")).toHaveCount(1);
+  await expect(page.getByTestId("admin-employee-row")).toContainText("张小龙");
+  await expect(page.getByTestId("admin-employee-row")).not.toContainText("张英俊");
+
+  await page.getByTestId("admin-employee-search-input").fill("不存在的员工");
+  await expect(page.getByTestId("admin-employee-search-empty")).toBeVisible();
+
+  await page.getByTestId("admin-employee-search-clear").click();
+  await expect(page.getByTestId("admin-employee-search-input")).toHaveValue("");
+  await expect(page.getByTestId("admin-employee-row").filter({ hasText: "张小龙" })).toBeVisible();
+  await expect(page.getByTestId("admin-employee-row").filter({ hasText: "张英俊" })).toBeVisible();
+});
+
 test("admin can add and disable an employee account", async ({ page, request }) => {
   test.skip(!adminPassword, "ADMIN_PASSWORD is required for employee management e2e coverage.");
 

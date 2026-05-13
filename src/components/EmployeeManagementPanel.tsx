@@ -13,6 +13,7 @@ export default function EmployeeManagementPanel() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const [newEmployeeName, setNewEmployeeName] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const [employeeMessage, setEmployeeMessage] = useState("");
   const [employeeError, setEmployeeError] = useState("");
   const [employeeSaving, setEmployeeSaving] = useState(false);
@@ -20,6 +21,10 @@ export default function EmployeeManagementPanel() {
 
   const activeEmployeeCount = employees.filter((employee) => employee.isActive).length;
   const inactiveEmployeeCount = employees.length - activeEmployeeCount;
+  const normalizedSearch = employeeSearch.trim().toLowerCase();
+  const visibleEmployees = normalizedSearch
+    ? employees.filter((employee) => employee.name.toLowerCase().includes(normalizedSearch))
+    : employees;
 
   const fetchEmployees = useCallback(async () => {
     setEmployeesLoading(true);
@@ -148,14 +153,53 @@ export default function EmployeeManagementPanel() {
         </p>
       )}
 
+      <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <label
+              htmlFor="employee-search"
+              className="mb-1 block text-xs font-black tracking-[0.18em] text-stone-500"
+            >
+              查询员工
+            </label>
+            <input
+              id="employee-search"
+              value={employeeSearch}
+              data-testid="admin-employee-search-input"
+              onChange={(event) => setEmployeeSearch(event.target.value)}
+              placeholder="输入姓名快速查询，如：张小龙"
+              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-800 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+            <div
+              data-testid="admin-employee-search-count"
+              className="text-sm font-bold text-stone-500"
+            >
+              显示 {visibleEmployees.length} / {employees.length} 人
+            </div>
+            {employeeSearch ? (
+              <button
+                type="button"
+                data-testid="admin-employee-search-clear"
+                onClick={() => setEmployeeSearch("")}
+                className="rounded-xl bg-white px-3 py-2 text-xs font-black text-amber-700 shadow-sm transition-colors hover:bg-amber-50"
+              >
+                清空查询
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
       <div
         data-testid="admin-employee-list"
         className="mt-5 grid max-h-[360px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3"
       >
         {employeesLoading ? (
           <p className="text-sm font-semibold text-stone-400">员工加载中...</p>
-        ) : (
-          employees.map((employee) => (
+        ) : visibleEmployees.length > 0 ? (
+          visibleEmployees.map((employee) => (
             <div
               key={employee.id}
               data-testid="admin-employee-row"
@@ -192,6 +236,13 @@ export default function EmployeeManagementPanel() {
               </button>
             </div>
           ))
+        ) : (
+          <p
+            data-testid="admin-employee-search-empty"
+            className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-center text-sm font-semibold text-stone-400 sm:col-span-2 xl:col-span-3"
+          >
+            没有找到匹配的员工
+          </p>
         )}
       </div>
     </section>
