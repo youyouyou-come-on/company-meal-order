@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 interface Employee {
   id: number;
   name: string;
+  dingtalkUserId: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -13,7 +14,9 @@ export default function EmployeeManagementPanel() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const [newEmployeeName, setNewEmployeeName] = useState("");
+  const [newEmployeeDingtalkUserId, setNewEmployeeDingtalkUserId] = useState("");
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const [dingtalkUserIdEdits, setDingtalkUserIdEdits] = useState<Record<number, string>>({});
   const [employeeMessage, setEmployeeMessage] = useState("");
   const [employeeError, setEmployeeError] = useState("");
   const [employeeSaving, setEmployeeSaving] = useState(false);
@@ -23,7 +26,11 @@ export default function EmployeeManagementPanel() {
   const inactiveEmployeeCount = employees.length - activeEmployeeCount;
   const normalizedSearch = employeeSearch.trim().toLowerCase();
   const visibleEmployees = normalizedSearch
-    ? employees.filter((employee) => employee.name.toLowerCase().includes(normalizedSearch))
+    ? employees.filter(
+        (employee) =>
+          employee.name.toLowerCase().includes(normalizedSearch) ||
+          (employee.dingtalkUserId || "").toLowerCase().includes(normalizedSearch)
+      )
     : employees;
 
   const fetchEmployees = useCallback(async () => {
@@ -31,7 +38,13 @@ export default function EmployeeManagementPanel() {
     try {
       const response = await fetch("/api/admin/users", { cache: "no-store" });
       const data = await response.json();
-      setEmployees(data.users || []);
+      const users = (data.users || []) as Employee[];
+      setEmployees(users);
+      setDingtalkUserIdEdits(
+        Object.fromEntries(
+          users.map((employee) => [employee.id, employee.dingtalkUserId || ""])
+        )
+      );
     } catch {
       setEmployees([]);
     } finally {
@@ -57,7 +70,10 @@ export default function EmployeeManagementPanel() {
       const response = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({
+          name,
+          dingtalkUserId: newEmployeeDingtalkUserId.trim() || null,
+        }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -65,12 +81,40 @@ export default function EmployeeManagementPanel() {
         return;
       }
       setNewEmployeeName("");
+      setNewEmployeeDingtalkUserId("");
       setEmployeeMessage(data.restored ? "员工已重新启用" : "员工已添加");
       await fetchEmployees();
     } catch {
       setEmployeeError("保存员工失败");
     } finally {
       setEmployeeSaving(false);
+    }
+  };
+
+  const saveDingtalkUserId = async (employee: Employee) => {
+    setEmployeeUpdatingId(employee.id);
+    setEmployeeMessage("");
+    setEmployeeError("");
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: employee.id,
+          dingtalkUserId: dingtalkUserIdEdits[employee.id]?.trim() || null,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setEmployeeError(data.error || "更新钉钉 UserId 失败");
+        return;
+      }
+      setEmployeeMessage(data.user.dingtalkUserId ? "钉钉 UserId 已保存" : "钉钉 UserId 已清空");
+      await fetchEmployees();
+    } catch {
+      setEmployeeError("更新钉钉 UserId 失败");
+    } finally {
+      setEmployeeUpdatingId(null);
     }
   };
 
@@ -118,7 +162,7 @@ export default function EmployeeManagementPanel() {
         </div>
       </div>
 
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <input
           value={newEmployeeName}
           data-testid="admin-employee-name-input"
@@ -129,6 +173,13 @@ export default function EmployeeManagementPanel() {
             }
           }}
           placeholder="输入员工姓名，如：郭丽阳"
+          className="min-w-0 flex-1 rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-800 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+        <input
+          value={newEmployeeDingtalkUserId}
+          data-testid="admin-employee-new-dingtalk-input"
+          onChange={(event) => setNewEmployeeDingtalkUserId(event.target.value)}
+          placeholder="钉钉 UserId，可稍后补"
           className="min-w-0 flex-1 rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-800 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
         />
         <button
@@ -196,44 +247,78 @@ export default function EmployeeManagementPanel() {
         data-testid="admin-employee-list"
         className="mt-5 grid max-h-[360px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3"
       >
-        {employeesLoading ? (
+          {employeesLoading ? (
           <p className="text-sm font-semibold text-stone-400">员工加载中...</p>
         ) : visibleEmployees.length > 0 ? (
           visibleEmployees.map((employee) => (
             <div
               key={employee.id}
               data-testid="admin-employee-row"
-              className="flex items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3"
+              className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3"
             >
-              <div className="min-w-0">
-                <div className="truncate text-sm font-black text-stone-900">{employee.name}</div>
-                <div
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-black text-stone-900">{employee.name}</div>
+                  <div
+                    className={
+                      employee.isActive
+                        ? "mt-1 text-xs font-bold text-emerald-600"
+                        : "mt-1 text-xs font-bold text-stone-400"
+                    }
+                  >
+                    {employee.isActive ? "可登录" : "已停用"}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  data-testid="admin-employee-toggle"
+                  onClick={() => toggleEmployee(employee)}
+                  disabled={employeeUpdatingId === employee.id}
                   className={
                     employee.isActive
-                      ? "mt-1 text-xs font-bold text-emerald-600"
-                      : "mt-1 text-xs font-bold text-stone-400"
+                      ? "shrink-0 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
+                      : "shrink-0 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-600 transition-colors hover:bg-emerald-100 disabled:opacity-50"
                   }
                 >
-                  {employee.isActive ? "可登录" : "已停用"}
+                  {employeeUpdatingId === employee.id
+                    ? "处理中"
+                    : employee.isActive
+                      ? "停用"
+                      : "启用"}
+                </button>
+              </div>
+              <div className="mt-3 flex flex-col gap-2">
+                <label className="text-xs font-black tracking-[0.14em] text-stone-400">
+                  钉钉 UserId
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    value={dingtalkUserIdEdits[employee.id] || ""}
+                    data-testid="admin-employee-dingtalk-input"
+                    onChange={(event) =>
+                      setDingtalkUserIdEdits((current) => ({
+                        ...current,
+                        [employee.id]: event.target.value,
+                      }))
+                    }
+                    placeholder="未绑定"
+                    className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-800 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    data-testid="admin-employee-dingtalk-save"
+                    onClick={() => saveDingtalkUserId(employee)}
+                    disabled={
+                      employeeUpdatingId === employee.id ||
+                      (dingtalkUserIdEdits[employee.id] || "").trim() ===
+                        (employee.dingtalkUserId || "")
+                    }
+                    className="shrink-0 rounded-xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    保存
+                  </button>
                 </div>
               </div>
-              <button
-                type="button"
-                data-testid="admin-employee-toggle"
-                onClick={() => toggleEmployee(employee)}
-                disabled={employeeUpdatingId === employee.id}
-                className={
-                  employee.isActive
-                    ? "shrink-0 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
-                    : "shrink-0 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-600 transition-colors hover:bg-emerald-100 disabled:opacity-50"
-                }
-              >
-                {employeeUpdatingId === employee.id
-                  ? "处理中"
-                  : employee.isActive
-                    ? "停用"
-                    : "启用"}
-              </button>
             </div>
           ))
         ) : (

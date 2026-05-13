@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
-import { businessDateToUtcDate, isMealExpired, type MealType } from "@/lib/china-date";
+import {
+  businessDateToUtcDate,
+  isMealExpired,
+  isMealOrderableDate,
+  type MealType,
+} from "@/lib/china-date";
 
 const MIN_MEAL_QUANTITY = 1;
 const MAX_MEAL_QUANTITY = 20;
@@ -65,6 +70,9 @@ export async function POST(request: NextRequest) {
     if (!dateStr || !mealType || !["lunch", "dinner"].includes(mealType)) {
       return NextResponse.json({ error: "参数错误" }, { status: 400 });
     }
+    if (!isMealOrderableDate(dateStr)) {
+      return NextResponse.json({ error: "只能点今天和下一个可点餐日" }, { status: 400 });
+    }
     const quantity = parseQuantity(rawQuantity);
     if (quantity === null) {
       return NextResponse.json(
@@ -97,6 +105,9 @@ export async function DELETE(request: NextRequest) {
     const { date: dateStr, mealType } = body;
     if (!dateStr || !mealType || !["lunch", "dinner"].includes(mealType)) {
       return NextResponse.json({ error: "参数错误" }, { status: 400 });
+    }
+    if (!isMealOrderableDate(dateStr)) {
+      return NextResponse.json({ error: "只能取消今天和下一个可点餐日的点餐" }, { status: 400 });
     }
     if (isExpired(dateStr, mealType)) {
       return NextResponse.json({ error: "已超过取消截止时间" }, { status: 400 });

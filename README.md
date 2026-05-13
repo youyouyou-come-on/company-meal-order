@@ -4,15 +4,15 @@
 
 ## ✨ 功能特性
 
-- 📋 每周菜单展示（午餐/晚餐，按天切换）
-- ✅ 一键报名"吃"或取消
+- 📋 菜单展示（午餐/晚餐，只开放今天和下一个可点餐日）
+- ✅ 按份数点餐或取消
 - 👥 实时显示已报名人员和人数
 - ⏰ 自动截止（午餐 10:00 前，晚餐 15:00 前）
 - 🍽️ 菜品建议单（提交下周想吃什么）
 - 🔧 管理后台（密码保护，菜单增删改，复制上周菜单）
 - 👥 员工管理（密码保护，新增员工、停用/启用员工）
 - 📱 移动端友好（大按钮，响应式）
-- 🔑 简易登录（下拉选择姓名，无需密码）
+- 🔑 简易登录（姓名 + 公司内部统一密码）
 
 ## 🛠️ 技术栈
 
@@ -129,6 +129,13 @@ source ./deploy-remote.env
 | `ENABLE_DB_BACKUP` | 是否启用生产库备份 | `1` |
 | `DB_BACKUP_RETENTION_DAYS` | 生产库备份保留天数 | `14` |
 | `DB_BACKUP_CRON` | 每日备份 cron 时间 | `23 2 * * *` |
+| `ENABLE_DINGTALK_REMINDER` | 是否安装钉钉点餐提醒 cron | `0` |
+| `DINGTALK_CLIENT_ID` | 钉钉企业内部应用 Client ID | 无 |
+| `DINGTALK_CLIENT_SECRET` | 钉钉企业内部应用 Client Secret | 无 |
+| `DINGTALK_AGENT_ID` | 钉钉企业内部应用 AgentId | 无 |
+| `DINGTALK_REMINDER_URL` | 钉钉提醒里的点餐链接 | `https://meal.zcgc.club` |
+| `DINGTALK_REMINDER_FIRST_CRON` | 首次提醒时间 | `30 9 * * 1-6` |
+| `DINGTALK_REMINDER_SECOND_CRON` | 二次提醒时间 | `50 9 * * 1-6` |
 
 ## 👥 员工管理
 
@@ -136,7 +143,43 @@ source ./deploy-remote.env
 
 停用员工不会删除历史点餐记录，但该员工不能继续登录点餐。
 
+如果后续要接钉钉私聊提醒，可以在员工管理里为员工维护 **钉钉 UserId**。这个字段用于把点餐系统里的员工和钉钉账号绑定起来，未绑定的员工不会收到钉钉私聊提醒。
+
 如果需要在初始化新环境时批量补齐员工，也可以继续使用种子数据。
+
+## 🔔 钉钉私聊提醒准备
+
+钉钉私聊提醒建议走 **企业内部应用工作通知**：
+
+1. 在钉钉开放平台创建企业内部应用。
+2. 记录应用的 `AppKey`、`AppSecret` 和 `AgentId`，它们只应保存在服务器环境变量里，不要提交到 Git。
+3. 给应用开通发送工作通知消息的权限，并由企业管理员完成授权。
+4. 在员工管理页面为每位员工维护钉钉 `UserId`。
+5. 定时提醒脚本读取点餐数据库，筛出未点餐且已绑定 `UserId` 的员工，再通过钉钉工作通知逐个发送提醒。
+
+提醒建议配置为每天 `09:30` 和 `09:50` 各执行一次。脚本会先统计当天已经提交点餐的员工人数，如果低于 5 人，会认为今天可能是休假日或异常低活跃日，直接跳过提醒，避免误打扰全员。
+
+本地 dry-run 调试：
+
+```bash
+DATABASE_URL="file:./.runtime/local-preview.db" \
+DINGTALK_CLIENT_ID="你的 Client ID" \
+DINGTALK_CLIENT_SECRET="你的 Client Secret" \
+DINGTALK_AGENT_ID="你的 AgentId" \
+DINGTALK_REMINDER_URL="https://meal.zcgc.club" \
+pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --round=first
+```
+
+dry-run 只会查库、筛人、打印消息，不会真实发送。确认测试员工的钉钉 `UserId` 已绑定，并且管理员已经开通工作通知权限后，才可以显式加 `--live` 做真实发送测试：
+
+```bash
+DATABASE_URL="file:./.runtime/local-preview.db" \
+DINGTALK_CLIENT_ID="你的 Client ID" \
+DINGTALK_CLIENT_SECRET="你的 Client Secret" \
+DINGTALK_AGENT_ID="你的 AgentId" \
+DINGTALK_REMINDER_URL="https://meal.zcgc.club" \
+pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --round=first --live
+```
 
 **方式一：后台页面（推荐）**
 

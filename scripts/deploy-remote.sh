@@ -31,6 +31,13 @@ RUN_DEPLOY_E2E="${RUN_DEPLOY_E2E:-0}"
 ENABLE_DB_BACKUP="${ENABLE_DB_BACKUP:-1}"
 DB_BACKUP_RETENTION_DAYS="${DB_BACKUP_RETENTION_DAYS:-14}"
 DB_BACKUP_CRON="${DB_BACKUP_CRON:-23 2 * * *}"
+ENABLE_DINGTALK_REMINDER="${ENABLE_DINGTALK_REMINDER:-0}"
+DINGTALK_CLIENT_ID="${DINGTALK_CLIENT_ID:-}"
+DINGTALK_CLIENT_SECRET="${DINGTALK_CLIENT_SECRET:-}"
+DINGTALK_AGENT_ID="${DINGTALK_AGENT_ID:-}"
+DINGTALK_REMINDER_URL="${DINGTALK_REMINDER_URL:-}"
+DINGTALK_REMINDER_FIRST_CRON="${DINGTALK_REMINDER_FIRST_CRON:-30 9 * * 1-6}"
+DINGTALK_REMINDER_SECOND_CRON="${DINGTALK_REMINDER_SECOND_CRON:-50 9 * * 1-6}"
 
 usage() {
   cat <<'EOF'
@@ -66,6 +73,13 @@ usage() {
   ENABLE_DB_BACKUP      是否启用生产库备份，默认 1
   DB_BACKUP_RETENTION_DAYS  备份保留天数，默认 14
   DB_BACKUP_CRON        每日备份 cron 时间，默认 "23 2 * * *"
+  ENABLE_DINGTALK_REMINDER  是否启用钉钉点餐提醒 cron，默认 0
+  DINGTALK_CLIENT_ID    钉钉企业内部应用 Client ID
+  DINGTALK_CLIENT_SECRET 钉钉企业内部应用 Client Secret
+  DINGTALK_AGENT_ID     钉钉企业内部应用 AgentId
+  DINGTALK_REMINDER_URL 钉钉提醒里的点餐链接
+  DINGTALK_REMINDER_FIRST_CRON  首次提醒 cron，默认 "30 9 * * 1-6"
+  DINGTALK_REMINDER_SECOND_CRON 二次提醒 cron，默认 "50 9 * * 1-6"
 
 说明：
   1. 该脚本默认面向 Ubuntu / Debian，并要求使用 root SSH 登录。
@@ -194,6 +208,13 @@ FORCE_DB_SEED=$FORCE_DB_SEED
 ENABLE_DB_BACKUP=$ENABLE_DB_BACKUP
 DB_BACKUP_RETENTION_DAYS_B64=$(encode_b64 "$DB_BACKUP_RETENTION_DAYS")
 DB_BACKUP_CRON_B64=$(encode_b64 "$DB_BACKUP_CRON")
+ENABLE_DINGTALK_REMINDER=$ENABLE_DINGTALK_REMINDER
+DINGTALK_CLIENT_ID_B64=$(encode_b64 "$DINGTALK_CLIENT_ID")
+DINGTALK_CLIENT_SECRET_B64=$(encode_b64 "$DINGTALK_CLIENT_SECRET")
+DINGTALK_AGENT_ID_B64=$(encode_b64 "$DINGTALK_AGENT_ID")
+DINGTALK_REMINDER_URL_B64=$(encode_b64 "$DINGTALK_REMINDER_URL")
+DINGTALK_REMINDER_FIRST_CRON_B64=$(encode_b64 "$DINGTALK_REMINDER_FIRST_CRON")
+DINGTALK_REMINDER_SECOND_CRON_B64=$(encode_b64 "$DINGTALK_REMINDER_SECOND_CRON")
 EOF
 
 run_deploy_checks
@@ -272,12 +293,19 @@ admin_password_input="$(decode_b64 "$ADMIN_PASSWORD_B64")"
 cookie_secure_input="$(decode_b64 "$COOKIE_SECURE_B64")"
 backup_retention_days="$(decode_b64 "$DB_BACKUP_RETENTION_DAYS_B64")"
 backup_cron="$(decode_b64 "$DB_BACKUP_CRON_B64")"
+dingtalk_client_id_input="$(decode_b64 "$DINGTALK_CLIENT_ID_B64")"
+dingtalk_client_secret_input="$(decode_b64 "$DINGTALK_CLIENT_SECRET_B64")"
+dingtalk_agent_id_input="$(decode_b64 "$DINGTALK_AGENT_ID_B64")"
+dingtalk_reminder_url_input="$(decode_b64 "$DINGTALK_REMINDER_URL_B64")"
+dingtalk_reminder_first_cron="$(decode_b64 "$DINGTALK_REMINDER_FIRST_CRON_B64")"
+dingtalk_reminder_second_cron="$(decode_b64 "$DINGTALK_REMINDER_SECOND_CRON_B64")"
 
 env_file="${deploy_path}/.env"
 db_file="${deploy_path}/prod.db"
 backup_script="${deploy_path}/scripts/backup-prod-db.sh"
 backup_dir="${deploy_path}/backups/prod-db"
 backup_cron_file="/etc/cron.d/${service_name}-db-backup"
+dingtalk_reminder_cron_file="/etc/cron.d/${service_name}-dingtalk-reminder"
 runtime_dir="${deploy_path}/.runtime"
 log_out="/var/log/${service_name}.log"
 log_err="/var/log/${service_name}.error.log"
@@ -322,6 +350,10 @@ existing_login_lock_max_failed_attempts="$(read_env_value LOGIN_LOCK_MAX_FAILED_
 existing_login_lock_duration_minutes="$(read_env_value LOGIN_LOCK_DURATION_MINUTES "$env_file")"
 existing_admin_password="$(read_env_value ADMIN_PASSWORD "$env_file")"
 existing_cookie_secure="$(read_env_value COOKIE_SECURE "$env_file")"
+existing_dingtalk_client_id="$(read_env_value DINGTALK_CLIENT_ID "$env_file")"
+existing_dingtalk_client_secret="$(read_env_value DINGTALK_CLIENT_SECRET "$env_file")"
+existing_dingtalk_agent_id="$(read_env_value DINGTALK_AGENT_ID "$env_file")"
+existing_dingtalk_reminder_url="$(read_env_value DINGTALK_REMINDER_URL "$env_file")"
 
 session_password="${session_password_input:-$existing_session_password}"
 login_password="${login_password_input:-$existing_login_password}"
@@ -329,6 +361,10 @@ login_lock_max_failed_attempts="${login_lock_max_failed_attempts_input:-$existin
 login_lock_duration_minutes="${login_lock_duration_minutes_input:-$existing_login_lock_duration_minutes}"
 admin_password="${admin_password_input:-$existing_admin_password}"
 cookie_secure="${cookie_secure_input:-$existing_cookie_secure}"
+dingtalk_client_id="${dingtalk_client_id_input:-$existing_dingtalk_client_id}"
+dingtalk_client_secret="${dingtalk_client_secret_input:-$existing_dingtalk_client_secret}"
+dingtalk_agent_id="${dingtalk_agent_id_input:-$existing_dingtalk_agent_id}"
+dingtalk_reminder_url="${dingtalk_reminder_url_input:-$existing_dingtalk_reminder_url}"
 
 if [[ -z "$session_password" ]]; then
   echo "SESSION_PASSWORD 缺失。首次部署请提供 SESSION_PASSWORD。" >&2
@@ -351,7 +387,7 @@ fi
 
 {
   if [[ -f "$env_file" ]]; then
-    grep -Ev '^(DATABASE_URL|SESSION_PASSWORD|LOGIN_PASSWORD|LOGIN_LOCK_MAX_FAILED_ATTEMPTS|LOGIN_LOCK_DURATION_MINUTES|ADMIN_PASSWORD|COOKIE_SECURE|NODE_ENV|NEXT_TELEMETRY_DISABLED)=' "$env_file" || true
+    grep -Ev '^(DATABASE_URL|SESSION_PASSWORD|LOGIN_PASSWORD|LOGIN_LOCK_MAX_FAILED_ATTEMPTS|LOGIN_LOCK_DURATION_MINUTES|ADMIN_PASSWORD|COOKIE_SECURE|NODE_ENV|NEXT_TELEMETRY_DISABLED|DINGTALK_CLIENT_ID|DINGTALK_CLIENT_SECRET|DINGTALK_AGENT_ID|DINGTALK_REMINDER_URL)=' "$env_file" || true
   fi
   printf 'DATABASE_URL="file:./prod.db"\n'
   printf 'SESSION_PASSWORD="%s"\n' "$session_password"
@@ -364,6 +400,18 @@ fi
   fi
   printf 'ADMIN_PASSWORD="%s"\n' "$admin_password"
   printf 'COOKIE_SECURE="%s"\n' "$cookie_secure"
+  if [[ -n "$dingtalk_client_id" ]]; then
+    printf 'DINGTALK_CLIENT_ID="%s"\n' "$dingtalk_client_id"
+  fi
+  if [[ -n "$dingtalk_client_secret" ]]; then
+    printf 'DINGTALK_CLIENT_SECRET="%s"\n' "$dingtalk_client_secret"
+  fi
+  if [[ -n "$dingtalk_agent_id" ]]; then
+    printf 'DINGTALK_AGENT_ID="%s"\n' "$dingtalk_agent_id"
+  fi
+  if [[ -n "$dingtalk_reminder_url" ]]; then
+    printf 'DINGTALK_REMINDER_URL="%s"\n' "$dingtalk_reminder_url"
+  fi
   printf 'NODE_ENV="production"\n'
   printf 'NEXT_TELEMETRY_DISABLED="1"\n'
 } >"$tmp_env_file"
@@ -397,6 +445,23 @@ EOF
   chmod 644 "$backup_cron_file"
 else
   rm -f "$backup_cron_file"
+fi
+
+if [[ "$ENABLE_DINGTALK_REMINDER" == "1" ]]; then
+  if [[ -z "$dingtalk_client_id" || -z "$dingtalk_client_secret" || -z "$dingtalk_agent_id" ]]; then
+    echo "ENABLE_DINGTALK_REMINDER=1 时必须提供 DINGTALK_CLIENT_ID、DINGTALK_CLIENT_SECRET、DINGTALK_AGENT_ID。" >&2
+    exit 1
+  fi
+
+  cat >"$dingtalk_reminder_cron_file" <<EOF
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+${dingtalk_reminder_first_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --round=first --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
+${dingtalk_reminder_second_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --round=second --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
+EOF
+  chmod 644 "$dingtalk_reminder_cron_file"
+else
+  rm -f "$dingtalk_reminder_cron_file"
 fi
 
 runuser -u "$app_user" -- bash -lc "

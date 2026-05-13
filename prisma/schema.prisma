@@ -8,12 +8,13 @@ datasource db {
 }
 
 model User {
-  id          Int              @id @default(autoincrement())
-  name        String           @unique
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  signups     MealSignup[]
-  suggestions DishSuggestion[]
+  id             Int              @id @default(autoincrement())
+  name           String           @unique
+  dingtalkUserId String?          @unique
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  signups        MealSignup[]
+  suggestions    DishSuggestion[]
 }
 
 model WeeklyMenu {

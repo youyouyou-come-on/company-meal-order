@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
+  businessDateToUtcDate,
   formatDateLabel,
+  getBusinessWeekStart,
   getChinaHourInteger,
   getChinaTodayString,
-  getChinaWeekDates,
+  getOrderableDates,
   isMealExpired,
   type MealType,
 } from "@/lib/china-date";
@@ -34,10 +36,6 @@ type SummaryModalState = {
 
 const MIN_MEAL_QUANTITY = 1;
 const MAX_MEAL_QUANTITY = 20;
-
-function getWeekDates(weekOffset: number): string[] {
-  return getChinaWeekDates(weekOffset);
-}
 
 function getTodayStr(): string {
   return getChinaTodayString();
@@ -80,7 +78,6 @@ export default function Home() {
   const { user, loading: userLoading } = useCurrentUser();
   const router = useRouter();
   const today = getTodayStr();
-  const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [signupsBySlot, setSignupsBySlot] = useState<SignupMap>({});
@@ -89,15 +86,23 @@ export default function Home() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const signupRequestVersionRef = useRef<Record<string, number>>({});
 
-  const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
-  const weekStart = weekDates[0];
+  const orderableDates = useMemo(() => getOrderableDates(businessDateToUtcDate(today)), [today]);
+  const menuWeekStarts = useMemo(
+    () => Array.from(new Set(orderableDates.map((date) => getBusinessWeekStart(date)))),
+    [orderableDates]
+  );
 
   useEffect(() => {
-    fetch(`/api/menus/week?weekStart=${weekStart}`, { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data) => setMenus(data.menus || []))
+    Promise.all(
+      menuWeekStarts.map((weekStart) =>
+        fetch(`/api/menus/week?weekStart=${weekStart}`, { cache: "no-store" }).then((response) =>
+          response.json()
+        )
+      )
+    )
+      .then((results) => setMenus(results.flatMap((data) => data.menus || [])))
       .catch(() => setMenus([]));
-  }, [weekStart]);
+  }, [menuWeekStarts]);
 
   const fetchSignupsForDate = useCallback(async (date: string) => {
     const requestVersion = (signupRequestVersionRef.current[date] || 0) + 1;
@@ -149,16 +154,16 @@ export default function Home() {
   useEffect(() => {
     setSignupsBySlot({});
     setQuantityDrafts({});
-    Promise.all(weekDates.map((date) => fetchSignupsForDate(date))).catch(() => {});
-  }, [fetchSignupsForDate, weekDates]);
+    Promise.all(orderableDates.map((date) => fetchSignupsForDate(date))).catch(() => {});
+  }, [fetchSignupsForDate, orderableDates]);
 
   useEffect(() => {
     setSelectedDate((current) => {
-      if (weekDates.includes(current)) return current;
-      if (weekDates.includes(today)) return today;
-      return weekStart;
+      if (orderableDates.includes(current)) return current;
+      if (orderableDates.includes(today)) return today;
+      return orderableDates[0];
     });
-  }, [today, weekDates, weekStart]);
+  }, [today, orderableDates]);
 
   const getMenu = (date: string, mealType: MealType) =>
     menus.find((menu) => menu.date === date && menu.mealType === mealType);
@@ -255,7 +260,7 @@ export default function Home() {
                 {user ? `${greeting}，${user.name}！` : `${greeting}，欢迎来到公司食堂 🍽️`}
               </div>
               <p className="mt-1 text-sm text-amber-50">
-                先选周几，再点当天午餐和晚餐，页面会更清爽。
+                现在只开放今天和下一个可点餐日，避免大家提前点完整周。
               </p>
             </div>
             <div className="hidden rounded-2xl bg-white/15 px-4 py-3 text-right sm:block">
@@ -272,35 +277,15 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mb-5 rounded-2xl bg-white p-3 shadow-sm border border-orange-100 print:shadow-none">
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setWeekOffset(0)}
-              className={`rounded-xl px-4 py-3 text-base font-bold transition-all ${
-                weekOffset === 0
-                  ? "bg-amber-500 text-white shadow-md"
-                  : "bg-orange-50 text-amber-700 hover:bg-amber-100"
-              }`}
-            >
-              本周点餐
-            </button>
-            <button
-              type="button"
-              onClick={() => setWeekOffset(1)}
-              className={`rounded-xl px-4 py-3 text-base font-bold transition-all ${
-                weekOffset === 1
-                  ? "bg-amber-500 text-white shadow-md"
-                  : "bg-orange-50 text-amber-700 hover:bg-amber-100"
-              }`}
-            >
-              下周点餐
-            </button>
-          </div>
+        <div className="mb-5 rounded-2xl border border-orange-100 bg-white p-4 shadow-sm print:shadow-none">
+          <div className="text-sm font-bold text-amber-700">点餐开放范围</div>
+          <p className="mt-1 text-sm text-gray-500">
+            只允许提交今天和下一个可点餐日；周六会跳过周日，开放周六和下周一。
+          </p>
         </div>
 
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 print:grid-cols-3">
-          {weekDates.map((date) => {
+          {orderableDates.map((date) => {
             const { dayLabel, shortDate } = formatDateLabel(date);
             const isToday = date === today;
             const isSelected = date === selectedDate;

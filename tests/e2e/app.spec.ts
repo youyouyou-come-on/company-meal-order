@@ -2,8 +2,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   addBusinessDays,
   getBusinessDateWeekday,
-  getChinaTodayString,
   getChinaWeekStart,
+  getOrderableDates,
 } from "../../src/lib/china-date";
 
 const adminPassword = process.env.ADMIN_PASSWORD ?? "";
@@ -20,27 +20,20 @@ const e2eUserName = "张英俊";
 const e2eSecondUserName = "杜平花";
 type MealType = "lunch" | "dinner";
 
-function todayIsoDate() {
-  return getChinaTodayString();
-}
-
 function currentSelectableDate() {
-  const today = todayIsoDate();
-  const day = getBusinessDateWeekday(today);
-  if (day === 0) {
-    return addBusinessDays(today, -6);
-  }
-  return today;
-}
-
-function currentWeekPastDate() {
-  const mondayStr = getChinaWeekStart();
-
-  return mondayStr < todayIsoDate() ? mondayStr : null;
+  return getOrderableDates()[0];
 }
 
 function nextWeekMondayIsoDate() {
   return getChinaWeekStart(new Date(), 1);
+}
+
+function nextOrderableDate() {
+  return getOrderableDates()[1] ?? getOrderableDates()[0];
+}
+
+function nonOrderableFutureDate() {
+  return addBusinessDays(nextOrderableDate(), 1);
 }
 
 function getMondayFromDate(dateStr: string) {
@@ -68,11 +61,9 @@ async function logout(page: Page) {
 async function openMealCard(
   page: Page,
   date: string,
-  week: "current" | "next",
   mealType: MealType = "lunch"
 ) {
   await page.goto("/");
-  await page.getByRole("button", { name: week === "next" ? "下周点餐" : "本周点餐" }).click();
   await page.getByTestId(`home-day-tab-${date}`).click();
   const mealCard = page.getByTestId(`home-meal-${date}-${mealType}`);
   await expect(mealCard).toBeVisible();
@@ -149,7 +140,7 @@ async function ensureMealQuantity(
   mealType: MealType,
   quantity: number
 ) {
-  const mealCard = await openMealCard(page, date, "next", mealType);
+  const mealCard = await openMealCard(page, date, mealType);
   const confirmButton = mealCard.locator('button[data-testid$="-confirm"]');
   const cancelButton = mealCard.locator('button[data-testid$="-cancel"]');
   const quantityInput = mealCard.locator('input[data-testid$="-quantity-input"]');
@@ -191,13 +182,15 @@ test("user can login and view current meal cards", async ({ page }) => {
   await expect(page.getByRole("link", { name: "员工管理" })).toBeVisible();
 });
 
-test("past dates are marked as expired instead of available", async ({ page }) => {
-  const expiredDate = currentWeekPastDate();
-  test.skip(!expiredDate, "当前周没有已过期日期可验证。");
-
+test("home only shows today and the next orderable day", async ({ page }) => {
   await login(page, e2eUserName);
-  await expect(page.getByTestId(`home-day-tab-${expiredDate}`)).toContainText("已过期");
-  await expect(page.getByTestId(`home-day-tab-${expiredDate}`)).not.toContainText("可点餐日");
+
+  const [firstDate, secondDate] = getOrderableDates();
+  await expect(page.getByTestId(`home-day-tab-${firstDate}`)).toBeVisible();
+  await expect(page.getByTestId(`home-day-tab-${secondDate}`)).toBeVisible();
+  await expect(page.getByTestId(`home-day-tab-${nonOrderableFutureDate()}`)).not.toBeVisible();
+  await expect(page.getByText("点餐开放范围")).toBeVisible();
+  await expect(page.getByText("周六会跳过周日")).toBeVisible();
 });
 
 test("login does not expose employee list and requires the shared password", async ({ page }) => {
@@ -321,7 +314,8 @@ test("all main page navigations work", async ({ page }) => {
 
   await page.getByRole("link", { name: "点餐" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("button", { name: "下周点餐" })).toBeVisible();
+  await expect(page.getByText("点餐开放范围")).toBeVisible();
+  await expect(page.getByRole("button", { name: "下周点餐" })).not.toBeVisible();
 
   await logout(page);
   await page.goto("/admin");
@@ -330,16 +324,16 @@ test("all main page navigations work", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("user can adjust next week's lunch quantity and cancel it later", async ({ page }) => {
+test("user can adjust next orderable lunch quantity and cancel it later", async ({ page }) => {
   await login(page);
-  const targetDate = nextWeekMondayIsoDate();
-  await openMealCard(page, targetDate, "next");
+  const targetDate = nextOrderableDate();
+  await openMealCard(page, targetDate);
   await expect(page.getByTestId(`home-meal-${targetDate}-lunch-status-note`)).toContainText("请选择 1 份或多份");
 
   await ensureMealQuantity(page, targetDate, "lunch", 0);
   await page.reload();
 
-  const refreshedMealCard = await openMealCard(page, targetDate, "next");
+  const refreshedMealCard = await openMealCard(page, targetDate);
   const baselineTotal = await readMealTotalQuantity(refreshedMealCard);
 
   await setMealQuantity(refreshedMealCard, 2);
@@ -424,21 +418,21 @@ test("admin can save a menu and the saved value survives reload", async ({ page 
 
 test("signup data persists after reload and re-login", async ({ page }) => {
   await login(page);
-  const targetDate = nextWeekMondayIsoDate();
+  const targetDate = nextOrderableDate();
 
   await ensureMealQuantity(page, targetDate, "lunch", 0);
   let mealCard = await ensureMealQuantity(page, targetDate, "lunch", 2);
   await expect(mealCard.locator('button[data-testid$="-cancel"]')).toBeVisible();
 
   await page.reload();
-  mealCard = await openMealCard(page, targetDate, "next");
+  mealCard = await openMealCard(page, targetDate);
   await expect(mealCard.locator('button[data-testid$="-cancel"]')).toBeVisible();
   await expect(mealCard.locator('input[data-testid$="-quantity-input"]')).toHaveValue("2");
   await expect(mealCard).toContainText(`${e2eUserName} × 2`);
 
   await logout(page);
   await login(page);
-  mealCard = await openMealCard(page, targetDate, "next");
+  mealCard = await openMealCard(page, targetDate);
   await expect(mealCard.locator('button[data-testid$="-cancel"]')).toBeVisible();
   await expect(mealCard.locator('input[data-testid$="-quantity-input"]')).toHaveValue("2");
 
@@ -456,6 +450,19 @@ test("guest can browse suggestions but must login before signing up", async ({ p
   await page.goto("/suggestions");
   await expect(page.getByText("登录后可以匿名提交建议哦")).toBeVisible();
   await expect(page.getByTestId("suggestion-input")).not.toBeVisible();
+});
+
+test("signup api rejects dates outside today and the next orderable day", async ({ page }) => {
+  await login(page);
+
+  const response = await page.request.post("/api/signups", {
+    data: { date: nonOrderableFutureDate(), mealType: "lunch", quantity: 1 },
+  });
+
+  expect(response.status()).toBe(400);
+  await expect(response.json()).resolves.toMatchObject({
+    error: "只能点今天和下一个可点餐日",
+  });
 });
 
 test("admin verification rejects wrong password and accepts the correct one", async ({ page }) => {
@@ -522,15 +529,28 @@ test("admin can add and disable an employee account", async ({ page, request }) 
   await verifyEmployeeAdmin(page);
 
   const employeeName = `E2E员工${Date.now()}`;
+  const dingtalkUserId = `e2e-dingtalk-${Date.now()}`;
+  const updatedDingtalkUserId = `${dingtalkUserId}-updated`;
   const employeeRow = () =>
     page.getByTestId("admin-employee-row").filter({ hasText: employeeName });
 
   try {
     await expect(page.getByTestId("admin-employee-panel")).toBeVisible();
     await page.getByTestId("admin-employee-name-input").fill(employeeName);
+    await page.getByTestId("admin-employee-new-dingtalk-input").fill(dingtalkUserId);
     await page.getByTestId("admin-employee-add").click();
     await expect(employeeRow()).toBeVisible();
     await expect(employeeRow()).toContainText("可登录");
+    await expect(employeeRow().getByTestId("admin-employee-dingtalk-input")).toHaveValue(
+      dingtalkUserId
+    );
+
+    await employeeRow().getByTestId("admin-employee-dingtalk-input").fill(updatedDingtalkUserId);
+    await employeeRow().getByTestId("admin-employee-dingtalk-save").click();
+    await expect(page.getByText("钉钉 UserId 已保存")).toBeVisible();
+    await expect(employeeRow().getByTestId("admin-employee-dingtalk-input")).toHaveValue(
+      updatedDingtalkUserId
+    );
 
     const loginResponse = await request.post("/api/auth/login", {
       headers: { "x-forwarded-for": `203.0.113.${Date.now() % 200}` },
@@ -561,7 +581,7 @@ test("admin can add and disable an employee account", async ({ page, request }) 
       );
       if (employee) {
         await page.request.patch("/api/admin/users", {
-          data: { id: employee.id, isActive: true },
+          data: { id: employee.id, isActive: true, dingtalkUserId: null },
         });
       }
     }
@@ -573,7 +593,7 @@ test("two users see consistent signup counts and attendee names", async ({ brows
   const secondContext = await browser.newContext();
   const firstPage = await firstContext.newPage();
   const secondPage = await secondContext.newPage();
-  const targetDate = nextWeekMondayIsoDate();
+  const targetDate = nextOrderableDate();
 
   try {
     await login(firstPage, e2eUserName);
@@ -582,7 +602,7 @@ test("two users see consistent signup counts and attendee names", async ({ brows
     await ensureMealQuantity(firstPage, targetDate, "dinner", 0);
     await ensureMealQuantity(secondPage, targetDate, "dinner", 0);
 
-    let firstMealCard = await openMealCard(firstPage, targetDate, "next", "dinner");
+    let firstMealCard = await openMealCard(firstPage, targetDate, "dinner");
     const baselineTotal = await readMealTotalQuantity(firstMealCard);
 
     firstMealCard = await ensureMealQuantity(firstPage, targetDate, "dinner", 1);
@@ -591,9 +611,9 @@ test("two users see consistent signup counts and attendee names", async ({ brows
     );
     await expect(firstMealCard).toContainText(e2eUserName);
 
-    let secondMealCard = await openMealCard(secondPage, targetDate, "next", "dinner");
+    let secondMealCard = await openMealCard(secondPage, targetDate, "dinner");
     await secondPage.reload();
-    secondMealCard = await openMealCard(secondPage, targetDate, "next", "dinner");
+    secondMealCard = await openMealCard(secondPage, targetDate, "dinner");
     await expect(secondMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
       String(baselineTotal + 1)
     );
@@ -607,7 +627,7 @@ test("two users see consistent signup counts and attendee names", async ({ brows
     await expect(secondMealCard).toContainText(`${e2eSecondUserName} × 2`);
 
     await firstPage.reload();
-    firstMealCard = await openMealCard(firstPage, targetDate, "next", "dinner");
+    firstMealCard = await openMealCard(firstPage, targetDate, "dinner");
     await expect(firstMealCard.locator('[data-testid$="-total-quantity"]')).toHaveText(
       String(baselineTotal + 3)
     );

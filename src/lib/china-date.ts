@@ -65,6 +65,11 @@ export function getBusinessDateWeekday(dateStr: string) {
 
 export function getChinaWeekStart(date = new Date(), weekOffset = 0) {
   const today = getChinaTodayString(date);
+  return getBusinessWeekStart(today, weekOffset);
+}
+
+export function getBusinessWeekStart(dateStr: string, weekOffset = 0) {
+  const today = dateStr;
   const day = getBusinessDateWeekday(today);
   const diffToMonday = day === 0 ? -6 : 1 - day;
   return addBusinessDays(today, diffToMonday + weekOffset * 7);
@@ -91,6 +96,22 @@ export function formatDateLabel(dateStr: string) {
     dayLabel: DAY_LABELS[date.getUTCDay()],
     shortDate: `${date.getUTCMonth() + 1}/${date.getUTCDate()}`,
   };
+}
+
+export function getOrderableDates(date = new Date()) {
+  const today = getChinaTodayString(date);
+  const weekday = getBusinessDateWeekday(today);
+
+  if (weekday === 0) {
+    return [addBusinessDays(today, 1)];
+  }
+
+  const nextOrderableDate = weekday === 6 ? addBusinessDays(today, 2) : addBusinessDays(today, 1);
+  return [today, nextOrderableDate];
+}
+
+export function isMealOrderableDate(dateStr: string, now = new Date()) {
+  return getOrderableDates(now).includes(dateStr);
 }
 
 export function isMealExpired(dateStr: string, mealType: MealType, now = new Date()) {
