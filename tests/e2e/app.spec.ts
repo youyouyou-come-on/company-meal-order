@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   addBusinessDays,
   getBusinessDateWeekday,
+  getChinaWeekDates,
   getChinaWeekStart,
   getOrderableDates,
 } from "../../src/lib/china-date";
@@ -34,6 +35,18 @@ function nextOrderableDate() {
 
 function nonOrderableFutureDate() {
   return addBusinessDays(nextOrderableDate(), 1);
+}
+
+function menuPreviewOnlyDate() {
+  const orderableDateSet = new Set(getOrderableDates());
+  const previewDates = [...getChinaWeekDates(0, 6), ...getChinaWeekDates(1, 6)];
+  const previewOnlyDate = previewDates.find((date) => !orderableDateSet.has(date));
+
+  if (!previewOnlyDate) {
+    throw new Error("找不到只用于菜单预览的日期");
+  }
+
+  return previewOnlyDate;
 }
 
 function getMondayFromDate(dateStr: string) {
@@ -185,12 +198,21 @@ test("user can login and view current meal cards", async ({ page }) => {
 test("home only shows today and the next orderable day", async ({ page }) => {
   await login(page, e2eUserName);
 
-  const [firstDate, secondDate] = getOrderableDates();
-  await expect(page.getByTestId(`home-day-tab-${firstDate}`)).toBeVisible();
-  await expect(page.getByTestId(`home-day-tab-${secondDate}`)).toBeVisible();
-  await expect(page.getByTestId(`home-day-tab-${nonOrderableFutureDate()}`)).not.toBeVisible();
+  const orderableDates = getOrderableDates();
+  const previewOnlyDate = menuPreviewOnlyDate();
+
+  for (const date of orderableDates) {
+    await expect(page.getByTestId(`home-day-tab-${date}`)).toBeVisible();
+  }
+
+  await expect(page.getByTestId(`home-day-tab-${previewOnlyDate}`)).not.toBeVisible();
   await expect(page.getByText("点餐开放范围")).toBeVisible();
-  await expect(page.getByText("周六会跳过周日")).toBeVisible();
+  await expect(page.getByText("菜单仍展示本周和下周")).toBeVisible();
+  await expect(page.getByTestId("home-menu-preview")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "本周菜单" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "下周菜单" })).toBeVisible();
+  await expect(page.getByText("本周和下周菜单仅供查看")).toBeVisible();
+  await expect(page.getByTestId(`home-menu-preview-day-${previewOnlyDate}`)).toBeVisible();
 });
 
 test("login does not expose employee list and requires the shared password", async ({ page }) => {

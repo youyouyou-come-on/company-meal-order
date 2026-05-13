@@ -6,9 +6,10 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   businessDateToUtcDate,
   formatDateLabel,
-  getBusinessWeekStart,
   getChinaHourInteger,
   getChinaTodayString,
+  getChinaWeekDates,
+  getChinaWeekStart,
   getOrderableDates,
   isMealExpired,
   type MealType,
@@ -29,6 +30,11 @@ interface Signup {
 
 type SignupMap = Record<string, Signup[]>;
 type QuantityDraftMap = Record<string, number>;
+type MenuPreviewWeek = {
+  title: string;
+  weekStart: string;
+  dates: string[];
+};
 type SummaryModalState = {
   mealType: MealType;
   title: string;
@@ -86,10 +92,26 @@ export default function Home() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const signupRequestVersionRef = useRef<Record<string, number>>({});
 
-  const orderableDates = useMemo(() => getOrderableDates(businessDateToUtcDate(today)), [today]);
+  const todayDate = useMemo(() => businessDateToUtcDate(today), [today]);
+  const orderableDates = useMemo(() => getOrderableDates(todayDate), [todayDate]);
+  const menuPreviewWeeks = useMemo<MenuPreviewWeek[]>(
+    () => [
+      {
+        title: "本周菜单",
+        weekStart: getChinaWeekStart(todayDate, 0),
+        dates: getChinaWeekDates(0, 6, todayDate),
+      },
+      {
+        title: "下周菜单",
+        weekStart: getChinaWeekStart(todayDate, 1),
+        dates: getChinaWeekDates(1, 6, todayDate),
+      },
+    ],
+    [todayDate]
+  );
   const menuWeekStarts = useMemo(
-    () => Array.from(new Set(orderableDates.map((date) => getBusinessWeekStart(date)))),
-    [orderableDates]
+    () => menuPreviewWeeks.map((week) => week.weekStart),
+    [menuPreviewWeeks]
   );
 
   useEffect(() => {
@@ -280,7 +302,7 @@ export default function Home() {
         <div className="mb-5 rounded-2xl border border-orange-100 bg-white p-4 shadow-sm print:shadow-none">
           <div className="text-sm font-bold text-amber-700">点餐开放范围</div>
           <p className="mt-1 text-sm text-gray-500">
-            只允许提交今天和下一个可点餐日；周六会跳过周日，开放周六和下周一。
+            只允许提交今天和下一个可点餐日；菜单仍展示本周和下周，方便大家提前查看。
           </p>
         </div>
 
@@ -341,6 +363,83 @@ export default function Home() {
             );
           })}
         </div>
+
+        <section
+          data-testid="home-menu-preview"
+          className="mb-5 rounded-3xl border border-orange-100 bg-white p-4 shadow-sm print:shadow-none"
+        >
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold text-gray-900">菜单预览</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                本周和下周菜单仅供查看，点餐仍只开放今天和下一个可点餐日。
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-amber-700">只读菜单，不会提交点餐</span>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {menuPreviewWeeks.map((week) => (
+              <div
+                key={week.weekStart}
+                data-testid={`home-menu-preview-${week.weekStart}`}
+                className="rounded-2xl border border-orange-100 bg-orange-50/50 p-3"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-base font-extrabold text-gray-900">{week.title}</h3>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-700">
+                    {formatDateLabel(week.dates[0]).shortDate} -{" "}
+                    {formatDateLabel(week.dates[week.dates.length - 1]).shortDate}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {week.dates.map((date) => {
+                    const { dayLabel, shortDate } = formatDateLabel(date);
+                    const lunchMenu = getMenu(date, "lunch");
+                    const dinnerMenu = getMenu(date, "dinner");
+                    const isOrderable = orderableDates.includes(date);
+
+                    return (
+                      <div
+                        key={date}
+                        data-testid={`home-menu-preview-day-${date}`}
+                        className={`rounded-2xl border bg-white p-3 ${
+                          isOrderable ? "border-amber-200" : "border-orange-50"
+                        }`}
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <div className="font-extrabold text-gray-900">
+                            {dayLabel} {shortDate}
+                          </div>
+                          {isOrderable ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+                              可点餐
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">
+                              仅预览
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-2 text-sm leading-6 text-gray-700">
+                          <div>
+                            <span className="font-bold text-amber-700">午餐：</span>
+                            {lunchMenu?.dishes || <span className="text-gray-400">暂无菜单</span>}
+                          </div>
+                          <div>
+                            <span className="font-bold text-amber-700">晚餐：</span>
+                            {dinnerMenu?.dishes || <span className="text-gray-400">暂无菜单</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section
           data-testid={`home-selected-day-${selectedDate}`}
