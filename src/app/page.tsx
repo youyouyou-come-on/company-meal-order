@@ -3,6 +3,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import {
+  formatDateLabel,
+  getChinaHourInteger,
+  getChinaTodayString,
+  getChinaWeekDates,
+  isMealExpired,
+  type MealType,
+} from "@/lib/china-date";
 
 interface Menu {
   id: number;
@@ -17,7 +25,6 @@ interface Signup {
   quantity: number;
 }
 
-type MealType = "lunch" | "dinner";
 type SignupMap = Record<string, Signup[]>;
 type QuantityDraftMap = Record<string, number>;
 type SummaryModalState = {
@@ -25,56 +32,19 @@ type SummaryModalState = {
   title: string;
 } | null;
 
-const DAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const MIN_MEAL_QUANTITY = 1;
 const MAX_MEAL_QUANTITY = 20;
 
 function getWeekDates(weekOffset: number): string[] {
-  const now = new Date();
-  const day = now.getUTCDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() + diffToMonday + weekOffset * 7
-    )
-  );
-
-  const dates: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    const date = new Date(
-      Date.UTC(
-        monday.getUTCFullYear(),
-        monday.getUTCMonth(),
-        monday.getUTCDate() + i
-      )
-    );
-    dates.push(date.toISOString().split("T")[0]);
-  }
-  return dates;
+  return getChinaWeekDates(weekOffset);
 }
 
 function getTodayStr(): string {
-  return new Date().toISOString().split("T")[0];
-}
-
-function formatDateLabel(dateStr: string): { dayLabel: string; shortDate: string } {
-  const date = new Date(`${dateStr}T00:00:00.000Z`);
-  return {
-    dayLabel: DAY_LABELS[date.getUTCDay()],
-    shortDate: `${date.getUTCMonth() + 1}/${date.getUTCDate()}`,
-  };
+  return getChinaTodayString();
 }
 
 function isExpiredClient(dateStr: string, mealType: MealType): boolean {
-  const now = new Date();
-  const todayUTC = now.toISOString().split("T")[0];
-  if (dateStr < todayUTC) return true;
-  if (dateStr > todayUTC) return false;
-  const cutoffHour = mealType === "lunch" ? 10 : 15;
-  const chinaHour = (now.getUTCHours() + 8) % 24 + now.getUTCMinutes() / 60;
-  return chinaHour >= cutoffHour;
+  return isMealExpired(dateStr, mealType);
 }
 
 function isDayExpired(dateStr: string) {
@@ -264,7 +234,7 @@ export default function Home() {
     0
   );
 
-  const chinaHour = (new Date().getUTCHours() + 8) % 24;
+  const chinaHour = getChinaHourInteger();
   let greeting = "";
   if (chinaHour < 11) greeting = "早上好 ☀️";
   else if (chinaHour < 14) greeting = "中午好 🌤️";

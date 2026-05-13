@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import {
+  businessDateToUtcDate,
+  formatBusinessDate,
+  getBusinessWeekRange,
+  getChinaWeekStart,
+} from "@/lib/china-date";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 function getWeekRange(weekStart: string): { start: Date; end: Date } {
-  const start = new Date(weekStart + "T00:00:00.000Z");
-  const end = new Date(
-    Date.UTC(
-      start.getUTCFullYear(),
-      start.getUTCMonth(),
-      start.getUTCDate() + 6
-    )
-  );
-  return { start, end };
+  return getBusinessWeekRange(weekStart);
 }
 
 function getMondayOfCurrentWeek(): string {
-  const now = new Date();
-  const day = now.getUTCDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday)
-  );
-  return monday.toISOString().split("T")[0];
+  return getChinaWeekStart();
 }
 
 function serializeMenus(
@@ -36,7 +28,7 @@ function serializeMenus(
   >();
 
   for (const menu of menus) {
-    const date = menu.date.toISOString().split("T")[0];
+    const date = formatBusinessDate(menu.date);
     deduped.set(`${date}-${menu.mealType}`, {
       id: menu.id,
       date,
@@ -106,7 +98,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "无效的餐类型" }, { status: 400 });
     }
 
-    const dateObj = new Date(date + "T00:00:00.000Z");
+    const dateObj = businessDateToUtcDate(date);
 
     const menu = await prisma.weeklyMenu.upsert({
       where: { date_mealType: { date: dateObj, mealType } },
@@ -124,7 +116,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       menu: {
         id: menu.id,
-        date: menu.date.toISOString().split("T")[0],
+        date: formatBusinessDate(menu.date),
         mealType: menu.mealType,
         dishes: menu.dishes,
       },

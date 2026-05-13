@@ -71,9 +71,12 @@ source ./deploy-remote.env
 脚本会自动完成这些事：
 
 - 安装 Node.js、pnpm、构建依赖
+- 本地先执行 `pnpm lint` 和 `pnpm build`，失败则停止部署
 - 同步项目代码到远程目录
 - 生成或复用远程 `.env`
+- 在修改数据库结构前备份远程 `prod.db`
 - 初始化数据库并在首次部署时执行种子数据
+- 安装每日数据库定时备份，并按保留天数清理旧备份
 - 构建生产包并配置 `systemd` 开机自启
 - 按需安装 Nginx、绑定域名、申请 Let’s Encrypt 证书
 
@@ -89,8 +92,25 @@ source ./deploy-remote.env
 - `ADMIN_PASSWORD`：首次部署时必填
 - `APP_DOMAINS`：域名列表，多个域名用空格分隔
 - `ENABLE_HTTPS=1`：自动申请 HTTPS
+- `SKIP_DEPLOY_CHECKS=1`：跳过本地部署前 `lint/build`
+- `RUN_DEPLOY_E2E=1`：部署前额外执行 Playwright E2E
+- `ENABLE_DB_BACKUP=1`：启用部署前和每日生产库备份
+- `DB_BACKUP_RETENTION_DAYS`：备份保留天数，默认 14
+- `DB_BACKUP_CRON`：每日备份 cron 时间，默认 `23 2 * * *`
 
 如果只是普通更新，后续再次执行同一条命令即可。脚本会保留远程 `prod.db`，并默认沿用已有管理员密码与 session 密钥。
+
+生产库备份默认保存在远程服务器：
+
+```bash
+/opt/company-meal-order/backups/prod-db/
+```
+
+也可以手动执行一次本地或远程备份：
+
+```bash
+./scripts/backup-prod-db.sh ./prod.db ./backups/prod-db 14
+```
 
 ## ⚙️ 环境变量
 
@@ -103,6 +123,11 @@ source ./deploy-remote.env
 | `LOGIN_LOCK_DURATION_MINUTES` | 登录锁定时长（分钟） | `15` |
 | `ADMIN_PASSWORD` | 管理后台密码 | `123456` |
 | `COOKIE_SECURE` | HTTPS 时设为 `true` | `false` |
+| `SKIP_DEPLOY_CHECKS` | 是否跳过部署前 `lint/build` | `0` |
+| `RUN_DEPLOY_E2E` | 是否在部署前额外跑 Playwright E2E | `0` |
+| `ENABLE_DB_BACKUP` | 是否启用生产库备份 | `1` |
+| `DB_BACKUP_RETENTION_DAYS` | 生产库备份保留天数 | `14` |
+| `DB_BACKUP_CRON` | 每日备份 cron 时间 | `23 2 * * *` |
 
 ## 👥 员工管理
 

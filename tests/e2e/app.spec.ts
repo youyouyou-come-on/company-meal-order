@@ -1,4 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import {
+  addBusinessDays,
+  getBusinessDateWeekday,
+  getChinaTodayString,
+  getChinaWeekStart,
+} from "../../src/lib/china-date";
 
 const adminPassword = process.env.ADMIN_PASSWORD ?? "";
 const loginPassword = process.env.LOGIN_PASSWORD ?? "hzzcgc";
@@ -15,51 +21,32 @@ const e2eSecondUserName = "杜平花";
 type MealType = "lunch" | "dinner";
 
 function todayIsoDate() {
-  return new Date().toISOString().split("T")[0];
+  return getChinaTodayString();
 }
 
 function currentSelectableDate() {
-  const now = new Date();
-  const day = now.getUTCDay();
+  const today = todayIsoDate();
+  const day = getBusinessDateWeekday(today);
   if (day === 0) {
-    const monday = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6)
-    );
-    return monday.toISOString().split("T")[0];
+    return addBusinessDays(today, -6);
   }
-  return todayIsoDate();
+  return today;
 }
 
 function currentWeekPastDate() {
-  const now = new Date();
-  const day = now.getUTCDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday)
-  );
-  const mondayStr = monday.toISOString().split("T")[0];
+  const mondayStr = getChinaWeekStart();
 
   return mondayStr < todayIsoDate() ? mondayStr : null;
 }
 
 function nextWeekMondayIsoDate() {
-  const now = new Date();
-  const day = now.getUTCDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday + 7)
-  );
-  return monday.toISOString().split("T")[0];
+  return getChinaWeekStart(new Date(), 1);
 }
 
 function getMondayFromDate(dateStr: string) {
-  const date = new Date(`${dateStr}T00:00:00.000Z`);
-  const day = date.getUTCDay();
+  const day = getBusinessDateWeekday(dateStr);
   const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + diffToMonday)
-  );
-  return monday.toISOString().split("T")[0];
+  return addBusinessDays(dateStr, diffToMonday);
 }
 
 async function login(page: Page, userName = e2eUserName) {

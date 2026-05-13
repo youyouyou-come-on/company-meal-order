@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { businessDateToUtcDate, isMealExpired, type MealType } from "@/lib/china-date";
 
 const MIN_MEAL_QUANTITY = 1;
 const MAX_MEAL_QUANTITY = 20;
 
 function isExpired(dateStr: string, mealType: string): boolean {
-  const now = new Date();
-  const todayUTC = now.toISOString().split("T")[0];
-  if (dateStr < todayUTC) return true;
-  if (dateStr > todayUTC) return false;
-  // Same day: check time cutoff (UTC+8)
-  const cutoffHour = mealType === "lunch" ? 10 : 15;
-  const chinaHour = (now.getUTCHours() + 8) % 24 + now.getUTCMinutes() / 60;
-  return chinaHour >= cutoffHour;
+  return isMealExpired(dateStr, mealType as MealType);
 }
 
 function parseQuantity(value: unknown) {
@@ -38,7 +32,7 @@ export async function GET(request: NextRequest) {
     if (!dateStr || !mealType) {
       return NextResponse.json({ error: "缺少 date 或 mealType 参数" }, { status: 400 });
     }
-    const date = new Date(`${dateStr}T00:00:00.000Z`);
+    const date = businessDateToUtcDate(dateStr);
     const signups = await prisma.mealSignup.findMany({
       where: { date, mealType },
       include: { user: { select: { name: true } } },
@@ -81,7 +75,7 @@ export async function POST(request: NextRequest) {
     if (isExpired(dateStr, mealType)) {
       return NextResponse.json({ error: "已超过报名截止时间" }, { status: 400 });
     }
-    const date = new Date(`${dateStr}T00:00:00.000Z`);
+    const date = businessDateToUtcDate(dateStr);
     await prisma.mealSignup.upsert({
       where: { userId_date_mealType: { userId: session.userId, date, mealType } },
       update: { quantity },
@@ -107,7 +101,7 @@ export async function DELETE(request: NextRequest) {
     if (isExpired(dateStr, mealType)) {
       return NextResponse.json({ error: "已超过取消截止时间" }, { status: 400 });
     }
-    const date = new Date(`${dateStr}T00:00:00.000Z`);
+    const date = businessDateToUtcDate(dateStr);
     await prisma.mealSignup.deleteMany({
       where: { userId: session.userId, date, mealType },
     });

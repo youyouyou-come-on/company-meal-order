@@ -3,6 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import {
+  addBusinessDays,
+  businessDateToUtcDate,
+  formatDateLabel,
+  getBusinessDateWeekday,
+  getChinaWeekDates,
+  getChinaWeekStart,
+} from "@/lib/china-date";
 
 interface Menu {
   id: number;
@@ -18,35 +26,16 @@ interface Employee {
   createdAt: string;
 }
 
-const DAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-
-function getMondayDate(offset: number): Date {
-  const now = new Date();
-  const day = now.getUTCDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday + offset * 7)
-  );
+function getMondayDate(offset: number): string {
+  return getChinaWeekStart(new Date(), offset);
 }
 
-function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0];
+function formatDate(dateStr: string): string {
+  return dateStr;
 }
 
-function getWeekDates(monday: Date): string[] {
-  const dates: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + i));
-    dates.push(formatDate(d));
-  }
-  return dates;
-}
-
-function formatDateLabel(dateStr: string): { dayLabel: string; shortDate: string } {
-  const d = new Date(`${dateStr}T00:00:00.000Z`);
-  const dayLabel = DAY_LABELS[d.getUTCDay()];
-  const shortDate = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-  return { dayLabel, shortDate };
+function getWeekDates(monday: string): string[] {
+  return getChinaWeekDates(0, 6, businessDateToUtcDate(monday));
 }
 
 export default function AdminPage() {
@@ -83,17 +72,15 @@ export default function AdminPage() {
   const inactiveEmployeeCount = employees.length - activeEmployeeCount;
 
   function handleDatePick(dateStr: string) {
-    const picked = new Date(`${dateStr}T00:00:00.000Z`);
-    const pickedDay = picked.getUTCDay();
+    const pickedDay = getBusinessDateWeekday(dateStr);
     const diffToMonday = pickedDay === 0 ? -6 : 1 - pickedDay;
-    const pickedMonday = new Date(Date.UTC(picked.getUTCFullYear(), picked.getUTCMonth(), picked.getUTCDate() + diffToMonday));
-
-    const now = new Date();
-    const nowDay = now.getUTCDay();
-    const nowDiffToMonday = nowDay === 0 ? -6 : 1 - nowDay;
-    const currentMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + nowDiffToMonday));
-
-    const diffWeeks = Math.round((pickedMonday.getTime() - currentMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const pickedMonday = addBusinessDays(dateStr, diffToMonday);
+    const currentMonday = getChinaWeekStart();
+    const diffWeeks = Math.round(
+      (businessDateToUtcDate(pickedMonday).getTime() -
+        businessDateToUtcDate(currentMonday).getTime()) /
+        (7 * 24 * 60 * 60 * 1000)
+    );
     setWeekOffset(diffWeeks);
   }
 

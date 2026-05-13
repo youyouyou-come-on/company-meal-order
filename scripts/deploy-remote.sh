@@ -26,6 +26,11 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 COOKIE_SECURE="${COOKIE_SECURE:-}"
 SEED_ON_FIRST_DEPLOY="${SEED_ON_FIRST_DEPLOY:-1}"
 FORCE_DB_SEED="${FORCE_DB_SEED:-0}"
+SKIP_DEPLOY_CHECKS="${SKIP_DEPLOY_CHECKS:-0}"
+RUN_DEPLOY_E2E="${RUN_DEPLOY_E2E:-0}"
+ENABLE_DB_BACKUP="${ENABLE_DB_BACKUP:-1}"
+DB_BACKUP_RETENTION_DAYS="${DB_BACKUP_RETENTION_DAYS:-14}"
+DB_BACKUP_CRON="${DB_BACKUP_CRON:-23 2 * * *}"
 
 usage() {
   cat <<'EOF'
@@ -56,6 +61,11 @@ usage() {
   COOKIE_SECURE          是否把 Cookie 设为 secure；默认会随 ENABLE_HTTPS 自动推断
   SEED_ON_FIRST_DEPLOY   首次部署时是否执行 seed，默认 1
   FORCE_DB_SEED         是否在当前部署中强制执行 seed，默认 0
+  SKIP_DEPLOY_CHECKS    是否跳过本地部署前检查，默认 0
+  RUN_DEPLOY_E2E        部署前是否额外跑 Playwright E2E，默认 0
+  ENABLE_DB_BACKUP      是否启用生产库备份，默认 1
+  DB_BACKUP_RETENTION_DAYS  备份保留天数，默认 14
+  DB_BACKUP_CRON        每日备份 cron 时间，默认 "23 2 * * *"
 
 说明：
   1. 该脚本默认面向 Ubuntu / Debian，并要求使用 root SSH 登录。
@@ -109,6 +119,29 @@ if [[ -n "$SSH_PASSWORD" ]] && ! command -v sshpass >/dev/null 2>&1; then
   exit 1
 fi
 
+run_deploy_checks() {
+  if [[ "$SKIP_DEPLOY_CHECKS" == "1" ]]; then
+    echo "==> 已跳过本地部署前检查"
+    return
+  fi
+
+  if ! command -v pnpm >/dev/null 2>&1; then
+    echo "部署前检查需要本机安装 pnpm。" >&2
+    exit 1
+  fi
+
+  echo "==> 本地部署前检查：lint"
+  (cd "$ROOT_DIR" && pnpm lint)
+
+  echo "==> 本地部署前检查：build"
+  (cd "$ROOT_DIR" && pnpm build)
+
+  if [[ "$RUN_DEPLOY_E2E" == "1" ]]; then
+    echo "==> 本地部署前检查：Playwright E2E"
+    (cd "$ROOT_DIR" && pnpm test:e2e)
+  fi
+}
+
 normalize_domains() {
   printf "%s" "$1" | tr ',' ' ' | xargs
 }
@@ -158,7 +191,12 @@ ADMIN_PASSWORD_B64=$(encode_b64 "$ADMIN_PASSWORD")
 COOKIE_SECURE_B64=$(encode_b64 "$COOKIE_SECURE")
 SEED_ON_FIRST_DEPLOY=$SEED_ON_FIRST_DEPLOY
 FORCE_DB_SEED=$FORCE_DB_SEED
+ENABLE_DB_BACKUP=$ENABLE_DB_BACKUP
+DB_BACKUP_RETENTION_DAYS_B64=$(encode_b64 "$DB_BACKUP_RETENTION_DAYS")
+DB_BACKUP_CRON_B64=$(encode_b64 "$DB_BACKUP_CRON")
 EOF
+
+run_deploy_checks
 
 echo "==> 检查远程基础环境"
 "${SSH_BASE[@]}" \
@@ -174,6 +212,7 @@ rsync -az --delete \
   --exclude '.env' \
   --exclude 'deploy-remote.env' \
   --exclude 'prod.db' \
+  --exclude 'backups' \
   --exclude '.runtime' \
   --exclude 'playwright-report' \
   --exclude 'test-results' \
@@ -231,9 +270,14 @@ login_lock_max_failed_attempts_input="$(decode_b64 "$LOGIN_LOCK_MAX_FAILED_ATTEM
 login_lock_duration_minutes_input="$(decode_b64 "$LOGIN_LOCK_DURATION_MINUTES_B64")"
 admin_password_input="$(decode_b64 "$ADMIN_PASSWORD_B64")"
 cookie_secure_input="$(decode_b64 "$COOKIE_SECURE_B64")"
+backup_retention_days="$(decode_b64 "$DB_BACKUP_RETENTION_DAYS_B64")"
+backup_cron="$(decode_b64 "$DB_BACKUP_CRON_B64")"
 
 env_file="${deploy_path}/.env"
 db_file="${deploy_path}/prod.db"
+backup_script="${deploy_path}/scripts/backup-prod-db.sh"
+backup_dir="${deploy_path}/backups/prod-db"
+backup_cron_file="/etc/cron.d/${service_name}-db-backup"
 runtime_dir="${deploy_path}/.runtime"
 log_out="/var/log/${service_name}.log"
 log_err="/var/log/${service_name}.error.log"
@@ -245,7 +289,7 @@ IFS=' ' read -r -a domains_array <<< "$app_domains"
 
 export DEBIAN_FRONTEND=noninteractive
 
-packages=(build-essential sqlite3)
+packages=(build-essential sqlite3 cron)
 if [[ "$INSTALL_NGINX" == "1" ]]; then
   packages+=(nginx)
 fi
@@ -332,6 +376,27 @@ chmod 640 "$env_file"
 db_exists_before="0"
 if [[ -f "$db_file" ]]; then
   db_exists_before="1"
+fi
+
+if [[ "$ENABLE_DB_BACKUP" == "1" ]]; then
+  chmod +x "$backup_script"
+  mkdir -p "$backup_dir"
+  chown -R "$app_user:$app_user" "$backup_dir"
+
+  if [[ "$db_exists_before" == "1" ]]; then
+    echo "==> 备份当前生产数据库"
+    "$backup_script" "$db_file" "$backup_dir" "$backup_retention_days"
+    chown -R "$app_user:$app_user" "$backup_dir"
+  fi
+
+  cat >"$backup_cron_file" <<EOF
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+${backup_cron} root ${backup_script} ${db_file} ${backup_dir} ${backup_retention_days} >> /var/log/${service_name}-db-backup.log 2>&1
+EOF
+  chmod 644 "$backup_cron_file"
+else
+  rm -f "$backup_cron_file"
 fi
 
 runuser -u "$app_user" -- bash -lc "
