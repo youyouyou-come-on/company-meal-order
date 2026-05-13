@@ -37,13 +37,13 @@ function nonOrderableFutureDate() {
   return addBusinessDays(nextOrderableDate(), 1);
 }
 
-function menuPreviewOnlyDate() {
+function visibleButNotOrderableDate() {
   const orderableDateSet = new Set(getOrderableDates());
-  const previewDates = [...getChinaWeekDates(0, 6), ...getChinaWeekDates(1, 6)];
-  const previewOnlyDate = previewDates.find((date) => !orderableDateSet.has(date));
+  const visibleDates = [...getChinaWeekDates(0, 6), ...getChinaWeekDates(1, 6)];
+  const previewOnlyDate = visibleDates.find((date) => !orderableDateSet.has(date));
 
   if (!previewOnlyDate) {
-    throw new Error("找不到只用于菜单预览的日期");
+    throw new Error("找不到可展示但不可点餐的日期");
   }
 
   return previewOnlyDate;
@@ -77,6 +77,8 @@ async function openMealCard(
   mealType: MealType = "lunch"
 ) {
   await page.goto("/");
+  const weekButtonName = getMondayFromDate(date) === nextWeekMondayIsoDate() ? "下周点餐" : "本周点餐";
+  await page.getByRole("button", { name: weekButtonName }).click();
   await page.getByTestId(`home-day-tab-${date}`).click();
   const mealCard = page.getByTestId(`home-meal-${date}-${mealType}`);
   await expect(mealCard).toBeVisible();
@@ -195,24 +197,32 @@ test("user can login and view current meal cards", async ({ page }) => {
   await expect(page.getByRole("link", { name: "员工管理" })).toBeVisible();
 });
 
-test("home only shows today and the next orderable day", async ({ page }) => {
+test("home keeps the weekly date layout but blocks ordering after the next orderable day", async ({ page }) => {
   await login(page, e2eUserName);
 
   const orderableDates = getOrderableDates();
-  const previewOnlyDate = menuPreviewOnlyDate();
+  const previewOnlyDate = visibleButNotOrderableDate();
 
-  for (const date of orderableDates) {
+  await expect(page.getByRole("button", { name: "本周点餐" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "下周点餐" })).toBeVisible();
+
+  for (const date of getChinaWeekDates(0, 6)) {
     await expect(page.getByTestId(`home-day-tab-${date}`)).toBeVisible();
   }
 
-  await expect(page.getByTestId(`home-day-tab-${previewOnlyDate}`)).not.toBeVisible();
-  await expect(page.getByText("点餐开放范围")).toBeVisible();
-  await expect(page.getByText("菜单仍展示本周和下周")).toBeVisible();
-  await expect(page.getByTestId("home-menu-preview")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "本周菜单" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "下周菜单" })).toBeVisible();
-  await expect(page.getByText("本周和下周菜单仅供查看")).toBeVisible();
-  await expect(page.getByTestId(`home-menu-preview-day-${previewOnlyDate}`)).toBeVisible();
+  for (const date of orderableDates) {
+    await openMealCard(page, date, "lunch");
+  }
+
+  const nextMealCard = await openMealCard(page, nextOrderableDate(), "lunch");
+  await expect(nextMealCard.getByTestId(`home-meal-${nextOrderableDate()}-lunch-confirm`)).toBeVisible();
+
+  const blockedMealCard = await openMealCard(page, previewOnlyDate, "lunch");
+  await expect(blockedMealCard.getByText("暂未开放点餐")).toBeVisible();
+  await expect(blockedMealCard.getByTestId(`home-meal-${previewOnlyDate}-lunch-confirm`)).not.toBeVisible();
+  await expect(blockedMealCard.getByTestId(`home-meal-${previewOnlyDate}-lunch-status-note`)).toContainText(
+    "当前日期仅开放查看菜单"
+  );
 });
 
 test("login does not expose employee list and requires the shared password", async ({ page }) => {
@@ -336,8 +346,8 @@ test("all main page navigations work", async ({ page }) => {
 
   await page.getByRole("link", { name: "点餐" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText("点餐开放范围")).toBeVisible();
-  await expect(page.getByRole("button", { name: "下周点餐" })).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "本周点餐" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "下周点餐" })).toBeVisible();
 
   await logout(page);
   await page.goto("/admin");

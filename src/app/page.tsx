@@ -9,7 +9,6 @@ import {
   getChinaHourInteger,
   getChinaTodayString,
   getChinaWeekDates,
-  getChinaWeekStart,
   getOrderableDates,
   isMealExpired,
   type MealType,
@@ -30,11 +29,6 @@ interface Signup {
 
 type SignupMap = Record<string, Signup[]>;
 type QuantityDraftMap = Record<string, number>;
-type MenuPreviewWeek = {
-  title: string;
-  weekStart: string;
-  dates: string[];
-};
 type SummaryModalState = {
   mealType: MealType;
   title: string;
@@ -42,6 +36,10 @@ type SummaryModalState = {
 
 const MIN_MEAL_QUANTITY = 1;
 const MAX_MEAL_QUANTITY = 20;
+
+function getWeekDates(weekOffset: number): string[] {
+  return getChinaWeekDates(weekOffset);
+}
 
 function getTodayStr(): string {
   return getChinaTodayString();
@@ -84,6 +82,7 @@ export default function Home() {
   const { user, loading: userLoading } = useCurrentUser();
   const router = useRouter();
   const today = getTodayStr();
+  const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [signupsBySlot, setSignupsBySlot] = useState<SignupMap>({});
@@ -92,39 +91,16 @@ export default function Home() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const signupRequestVersionRef = useRef<Record<string, number>>({});
 
-  const todayDate = useMemo(() => businessDateToUtcDate(today), [today]);
-  const orderableDates = useMemo(() => getOrderableDates(todayDate), [todayDate]);
-  const menuPreviewWeeks = useMemo<MenuPreviewWeek[]>(
-    () => [
-      {
-        title: "本周菜单",
-        weekStart: getChinaWeekStart(todayDate, 0),
-        dates: getChinaWeekDates(0, 6, todayDate),
-      },
-      {
-        title: "下周菜单",
-        weekStart: getChinaWeekStart(todayDate, 1),
-        dates: getChinaWeekDates(1, 6, todayDate),
-      },
-    ],
-    [todayDate]
-  );
-  const menuWeekStarts = useMemo(
-    () => menuPreviewWeeks.map((week) => week.weekStart),
-    [menuPreviewWeeks]
-  );
+  const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
+  const weekStart = weekDates[0];
+  const orderableDates = useMemo(() => getOrderableDates(businessDateToUtcDate(today)), [today]);
 
   useEffect(() => {
-    Promise.all(
-      menuWeekStarts.map((weekStart) =>
-        fetch(`/api/menus/week?weekStart=${weekStart}`, { cache: "no-store" }).then((response) =>
-          response.json()
-        )
-      )
-    )
-      .then((results) => setMenus(results.flatMap((data) => data.menus || [])))
+    fetch(`/api/menus/week?weekStart=${weekStart}`, { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => setMenus(data.menus || []))
       .catch(() => setMenus([]));
-  }, [menuWeekStarts]);
+  }, [weekStart]);
 
   const fetchSignupsForDate = useCallback(async (date: string) => {
     const requestVersion = (signupRequestVersionRef.current[date] || 0) + 1;
@@ -176,16 +152,16 @@ export default function Home() {
   useEffect(() => {
     setSignupsBySlot({});
     setQuantityDrafts({});
-    Promise.all(orderableDates.map((date) => fetchSignupsForDate(date))).catch(() => {});
-  }, [fetchSignupsForDate, orderableDates]);
+    Promise.all(weekDates.map((date) => fetchSignupsForDate(date))).catch(() => {});
+  }, [fetchSignupsForDate, weekDates]);
 
   useEffect(() => {
     setSelectedDate((current) => {
-      if (orderableDates.includes(current)) return current;
-      if (orderableDates.includes(today)) return today;
-      return orderableDates[0];
+      if (weekDates.includes(current)) return current;
+      if (weekDates.includes(today)) return today;
+      return weekStart;
     });
-  }, [today, orderableDates]);
+  }, [today, weekDates, weekStart]);
 
   const getMenu = (date: string, mealType: MealType) =>
     menus.find((menu) => menu.date === date && menu.mealType === mealType);
@@ -271,6 +247,7 @@ export default function Home() {
   const summaryModalSignups = summaryModal
     ? getSignups(selectedDate, summaryModal.mealType)
     : [];
+  const isSelectedDateOrderable = orderableDates.includes(selectedDate);
 
   return (
     <div className="min-h-screen bg-orange-50/30 print:bg-white">
@@ -282,7 +259,7 @@ export default function Home() {
                 {user ? `${greeting}，${user.name}！` : `${greeting}，欢迎来到公司食堂 🍽️`}
               </div>
               <p className="mt-1 text-sm text-amber-50">
-                现在只开放今天和下一个可点餐日，避免大家提前点完整周。
+                先选周几，再点当天午餐和晚餐，页面会更清爽。
               </p>
             </div>
             <div className="hidden rounded-2xl bg-white/15 px-4 py-3 text-right sm:block">
@@ -299,15 +276,35 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mb-5 rounded-2xl border border-orange-100 bg-white p-4 shadow-sm print:shadow-none">
-          <div className="text-sm font-bold text-amber-700">点餐开放范围</div>
-          <p className="mt-1 text-sm text-gray-500">
-            只允许提交今天和下一个可点餐日；菜单仍展示本周和下周，方便大家提前查看。
-          </p>
+        <div className="mb-5 rounded-2xl bg-white p-3 shadow-sm border border-orange-100 print:shadow-none">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setWeekOffset(0)}
+              className={`rounded-xl px-4 py-3 text-base font-bold transition-all ${
+                weekOffset === 0
+                  ? "bg-amber-500 text-white shadow-md"
+                  : "bg-orange-50 text-amber-700 hover:bg-amber-100"
+              }`}
+            >
+              本周点餐
+            </button>
+            <button
+              type="button"
+              onClick={() => setWeekOffset(1)}
+              className={`rounded-xl px-4 py-3 text-base font-bold transition-all ${
+                weekOffset === 1
+                  ? "bg-amber-500 text-white shadow-md"
+                  : "bg-orange-50 text-amber-700 hover:bg-amber-100"
+              }`}
+            >
+              下周点餐
+            </button>
+          </div>
         </div>
 
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 print:grid-cols-3">
-          {orderableDates.map((date) => {
+          {weekDates.map((date) => {
             const { dayLabel, shortDate } = formatDateLabel(date);
             const isToday = date === today;
             const isSelected = date === selectedDate;
@@ -363,83 +360,6 @@ export default function Home() {
             );
           })}
         </div>
-
-        <section
-          data-testid="home-menu-preview"
-          className="mb-5 rounded-3xl border border-orange-100 bg-white p-4 shadow-sm print:shadow-none"
-        >
-          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-xl font-extrabold text-gray-900">菜单预览</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                本周和下周菜单仅供查看，点餐仍只开放今天和下一个可点餐日。
-              </p>
-            </div>
-            <span className="text-xs font-semibold text-amber-700">只读菜单，不会提交点餐</span>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            {menuPreviewWeeks.map((week) => (
-              <div
-                key={week.weekStart}
-                data-testid={`home-menu-preview-${week.weekStart}`}
-                className="rounded-2xl border border-orange-100 bg-orange-50/50 p-3"
-              >
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-gray-900">{week.title}</h3>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-700">
-                    {formatDateLabel(week.dates[0]).shortDate} -{" "}
-                    {formatDateLabel(week.dates[week.dates.length - 1]).shortDate}
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {week.dates.map((date) => {
-                    const { dayLabel, shortDate } = formatDateLabel(date);
-                    const lunchMenu = getMenu(date, "lunch");
-                    const dinnerMenu = getMenu(date, "dinner");
-                    const isOrderable = orderableDates.includes(date);
-
-                    return (
-                      <div
-                        key={date}
-                        data-testid={`home-menu-preview-day-${date}`}
-                        className={`rounded-2xl border bg-white p-3 ${
-                          isOrderable ? "border-amber-200" : "border-orange-50"
-                        }`}
-                      >
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <div className="font-extrabold text-gray-900">
-                            {dayLabel} {shortDate}
-                          </div>
-                          {isOrderable ? (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
-                              可点餐
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">
-                              仅预览
-                            </span>
-                          )}
-                        </div>
-                        <div className="space-y-2 text-sm leading-6 text-gray-700">
-                          <div>
-                            <span className="font-bold text-amber-700">午餐：</span>
-                            {lunchMenu?.dishes || <span className="text-gray-400">暂无菜单</span>}
-                          </div>
-                          <div>
-                            <span className="font-bold text-amber-700">晚餐：</span>
-                            {dinnerMenu?.dishes || <span className="text-gray-400">暂无菜单</span>}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
 
         <section
           data-testid={`home-selected-day-${selectedDate}`}
@@ -500,6 +420,7 @@ export default function Home() {
               currentUserQuantity={getUserQuantity(selectedDate, "lunch")}
               draftQuantity={getDraftQuantity(selectedDate, "lunch")}
               isExpired={isExpiredClient(selectedDate, "lunch")}
+              isOrderable={isSelectedDateOrderable}
               user={user}
               userLoading={userLoading}
               loading={actionLoading === slotKey(selectedDate, "lunch")}
@@ -519,6 +440,7 @@ export default function Home() {
               currentUserQuantity={getUserQuantity(selectedDate, "dinner")}
               draftQuantity={getDraftQuantity(selectedDate, "dinner")}
               isExpired={isExpiredClient(selectedDate, "dinner")}
+              isOrderable={isSelectedDateOrderable}
               user={user}
               userLoading={userLoading}
               loading={actionLoading === slotKey(selectedDate, "dinner")}
@@ -602,6 +524,7 @@ interface MealBlockProps {
   currentUserQuantity: number;
   draftQuantity: number;
   isExpired: boolean;
+  isOrderable: boolean;
   user: { id: number; name: string } | null;
   userLoading: boolean;
   loading: boolean;
@@ -622,6 +545,7 @@ function MealBlock({
   currentUserQuantity,
   draftQuantity,
   isExpired,
+  isOrderable,
   user,
   userLoading,
   loading,
@@ -637,6 +561,10 @@ function MealBlock({
     ? "正在读取你的点餐状态。"
     : !user
       ? "登录后才能点餐或取消。"
+      : !isOrderable && hasSignup
+        ? `你已点 ${currentUserQuantity} 份，但当前日期暂未开放修改。`
+      : !isOrderable
+        ? "当前日期仅开放查看菜单，暂不允许提交点餐。"
       : hasSignup && isExpired
         ? `你已点 ${currentUserQuantity} 份，但当前餐次已截止，不能再修改。`
         : isExpired
@@ -687,6 +615,13 @@ function MealBlock({
             className="w-full rounded-2xl bg-gray-300 py-3 text-base font-bold text-gray-600 transition-colors hover:bg-gray-400 hover:text-white"
           >
             请先登录
+          </button>
+        ) : !isOrderable ? (
+          <button
+            disabled
+            className="w-full rounded-2xl bg-gray-200 py-3 text-base font-bold text-gray-400"
+          >
+            暂未开放点餐
           </button>
         ) : hasSignup && isExpired ? (
           <button
