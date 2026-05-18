@@ -38,6 +38,8 @@ DINGTALK_AGENT_ID="${DINGTALK_AGENT_ID:-}"
 DINGTALK_REMINDER_URL="${DINGTALK_REMINDER_URL:-}"
 DINGTALK_REMINDER_FIRST_CRON="${DINGTALK_REMINDER_FIRST_CRON:-30 9 * * 1-6}"
 DINGTALK_REMINDER_SECOND_CRON="${DINGTALK_REMINDER_SECOND_CRON:-50 9 * * 1-6}"
+DINGTALK_DINNER_REMINDER_FIRST_CRON="${DINGTALK_DINNER_REMINDER_FIRST_CRON:-30 15 * * 1-6}"
+DINGTALK_DINNER_REMINDER_SECOND_CRON="${DINGTALK_DINNER_REMINDER_SECOND_CRON:-50 15 * * 1-6}"
 
 usage() {
   cat <<'EOF'
@@ -80,6 +82,8 @@ usage() {
   DINGTALK_REMINDER_URL 钉钉提醒里的点餐链接
   DINGTALK_REMINDER_FIRST_CRON  首次提醒 cron，默认 "30 9 * * 1-6"
   DINGTALK_REMINDER_SECOND_CRON 二次提醒 cron，默认 "50 9 * * 1-6"
+  DINGTALK_DINNER_REMINDER_FIRST_CRON  晚餐首次提醒 cron，默认 "30 15 * * 1-6"
+  DINGTALK_DINNER_REMINDER_SECOND_CRON 晚餐二次提醒 cron，默认 "50 15 * * 1-6"
 
 说明：
   1. 该脚本默认面向 Ubuntu / Debian，并要求使用 root SSH 登录。
@@ -215,6 +219,8 @@ DINGTALK_AGENT_ID_B64=$(encode_b64 "$DINGTALK_AGENT_ID")
 DINGTALK_REMINDER_URL_B64=$(encode_b64 "$DINGTALK_REMINDER_URL")
 DINGTALK_REMINDER_FIRST_CRON_B64=$(encode_b64 "$DINGTALK_REMINDER_FIRST_CRON")
 DINGTALK_REMINDER_SECOND_CRON_B64=$(encode_b64 "$DINGTALK_REMINDER_SECOND_CRON")
+DINGTALK_DINNER_REMINDER_FIRST_CRON_B64=$(encode_b64 "$DINGTALK_DINNER_REMINDER_FIRST_CRON")
+DINGTALK_DINNER_REMINDER_SECOND_CRON_B64=$(encode_b64 "$DINGTALK_DINNER_REMINDER_SECOND_CRON")
 EOF
 
 run_deploy_checks
@@ -299,6 +305,8 @@ dingtalk_agent_id_input="$(decode_b64 "$DINGTALK_AGENT_ID_B64")"
 dingtalk_reminder_url_input="$(decode_b64 "$DINGTALK_REMINDER_URL_B64")"
 dingtalk_reminder_first_cron="$(decode_b64 "$DINGTALK_REMINDER_FIRST_CRON_B64")"
 dingtalk_reminder_second_cron="$(decode_b64 "$DINGTALK_REMINDER_SECOND_CRON_B64")"
+dingtalk_dinner_reminder_first_cron="$(decode_b64 "$DINGTALK_DINNER_REMINDER_FIRST_CRON_B64")"
+dingtalk_dinner_reminder_second_cron="$(decode_b64 "$DINGTALK_DINNER_REMINDER_SECOND_CRON_B64")"
 
 env_file="${deploy_path}/.env"
 db_file="${deploy_path}/prod.db"
@@ -458,6 +466,8 @@ SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ${dingtalk_reminder_first_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --round=first --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
 ${dingtalk_reminder_second_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --round=second --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
+${dingtalk_dinner_reminder_first_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --meal=dinner --round=first --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
+${dingtalk_dinner_reminder_second_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --meal=dinner --round=second --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
 EOF
   chmod 644 "$dingtalk_reminder_cron_file"
 else

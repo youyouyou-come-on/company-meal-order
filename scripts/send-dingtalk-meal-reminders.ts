@@ -9,8 +9,15 @@ import {
 } from "../src/lib/dingtalk";
 
 type ReminderRound = "first" | "second";
+type ReminderMealScope = "all" | "lunch" | "dinner";
 
 const MIN_SUBMITTED_USERS_FOR_REMINDER = 5;
+
+const MEAL_SCOPE_LABELS: Record<ReminderMealScope, string> = {
+  all: "点餐",
+  lunch: "午餐",
+  dinner: "晚餐",
+};
 
 type ReminderTarget = {
   id: number;
@@ -34,22 +41,55 @@ function parseArgs() {
 
   const roundValue = getValue("round");
   const round: ReminderRound = roundValue === "second" ? "second" : "first";
+  const mealValue = getValue("meal") || getValue("mealType");
+  const meal: ReminderMealScope =
+    mealValue === "lunch" || mealValue === "dinner" ? mealValue : "all";
 
   return {
     date: getValue("date") || getChinaTodayString(),
     name: getValue("name"),
     round,
+    meal,
     live: args.includes("--live"),
   };
 }
 
-function buildReminderContent(employeeName: string, round: ReminderRound, date: string) {
+function getReminderRoundLabel(round: ReminderRound, meal: ReminderMealScope) {
+  if (meal === "dinner") {
+    return round === "second" ? "15 点 50 二次提醒" : "15 点半首次提醒";
+  }
+
+  return round === "second" ? "9 点 50 二次提醒" : "9 点半首次提醒";
+}
+
+function getReminderSuffix(round: ReminderRound, meal: ReminderMealScope) {
+  if (meal === "dinner") {
+    return round === "second"
+      ? "系统 15 点 50 再次检查到你今天还没有提交晚餐点餐。"
+      : "系统 15 点半检查到你今天还没有提交晚餐点餐。";
+  }
+
+  if (meal === "lunch") {
+    return round === "second"
+      ? "系统 9 点 50 再次检查到你今天还没有提交午餐点餐。"
+      : "系统 9 点半检查到你今天还没有提交午餐点餐。";
+  }
+
+  return round === "second"
+    ? "系统 9 点 50 再次检查到你今天还没有提交点餐。"
+    : "系统 9 点半检查到你今天还没有提交点餐。";
+}
+
+function buildReminderContent(
+  employeeName: string,
+  round: ReminderRound,
+  date: string,
+  meal: ReminderMealScope
+) {
   const url = process.env["DINGTALK_REMINDER_URL"]?.trim() || "https://meal.zcgc.club";
-  const title = round === "second" ? "点餐二次提醒" : "点餐提醒";
-  const suffix =
-    round === "second"
-      ? "系统 9 点 50 再次检查到你今天还没有提交点餐。"
-      : "系统 9 点半检查到你今天还没有提交点餐。";
+  const mealLabel = MEAL_SCOPE_LABELS[meal];
+  const title = round === "second" ? `${mealLabel}二次提醒` : `${mealLabel}提醒`;
+  const suffix = getReminderSuffix(round, meal);
 
   return `${title}\n\n${employeeName}，${suffix}\n\n请点击进入：${url}\n\n如果你今天不吃，也请进入系统明确提交，避免重复提醒。\n\n日期：${date}`;
 }
@@ -69,20 +109,28 @@ async function findActiveUsersWithSignups(date: string) {
   return users as ReminderTarget[];
 }
 
-function getReminderTargets(users: ReminderTarget[]) {
-  return users.filter((user) => user.signups.length === 0);
+function hasSubmitted(user: ReminderTarget, meal: ReminderMealScope) {
+  if (meal === "all") {
+    return user.signups.length > 0;
+  }
+
+  return user.signups.some((signup) => signup.mealType === meal);
 }
 
-function getSubmittedUserCount(users: ReminderTarget[]) {
-  return users.filter((user) => user.signups.length > 0).length;
+function getReminderTargets(users: ReminderTarget[], meal: ReminderMealScope) {
+  return users.filter((user) => !hasSubmitted(user, meal));
+}
+
+function getSubmittedUserCount(users: ReminderTarget[], meal: ReminderMealScope) {
+  return users.filter((user) => hasSubmitted(user, meal)).length;
 }
 
 async function main() {
-  const { date, name, round, live } = parseArgs();
+  const { date, name, round, meal, live } = parseArgs();
   const { config, missing } = loadDingtalkConfigFromEnv();
   const activeUsers = await findActiveUsersWithSignups(date);
-  const submittedUserCount = getSubmittedUserCount(activeUsers);
-  const targets = getReminderTargets(activeUsers).filter((target) =>
+  const submittedUserCount = getSubmittedUserCount(activeUsers, meal);
+  const targets = getReminderTargets(activeUsers, meal).filter((target) =>
     name ? target.name === name : true
   );
   const sendableTargets = targets.filter((target) => target.dingtalkUserId);
@@ -90,16 +138,17 @@ async function main() {
 
   console.log(`点餐提醒检查日期：${date}`);
   if (name) console.log(`指定员工：${name}`);
-  console.log(`提醒轮次：${round === "second" ? "9 点 50 二次提醒" : "9 点半首次提醒"}`);
+  console.log(`提醒餐次：${MEAL_SCOPE_LABELS[meal]}`);
+  console.log(`提醒轮次：${getReminderRoundLabel(round, meal)}`);
   console.log(`运行模式：${live ? "live，可能真实发送钉钉工作通知" : "dry-run，只打印不发送"}`);
-  console.log(`今天已提交点餐员工人数：${submittedUserCount}`);
-  console.log(`未提交点餐人数：${targets.length}`);
+  console.log(`今天已提交${MEAL_SCOPE_LABELS[meal]}员工人数：${submittedUserCount}`);
+  console.log(`未提交${MEAL_SCOPE_LABELS[meal]}人数：${targets.length}`);
   console.log(`已绑定钉钉 UserId，可发送人数：${sendableTargets.length}`);
   console.log(`未绑定钉钉 UserId，跳过人数：${unboundTargets.length}`);
 
   if (!name && submittedUserCount < MIN_SUBMITTED_USERS_FOR_REMINDER) {
     console.log(
-      `今天已点餐员工少于 ${MIN_SUBMITTED_USERS_FOR_REMINDER} 人，可能是休假日，本轮不发送提醒。`
+      `今天已提交${MEAL_SCOPE_LABELS[meal]}员工少于 ${MIN_SUBMITTED_USERS_FOR_REMINDER} 人，可能是休假日，本轮不发送提醒。`
     );
     return;
   }
@@ -112,7 +161,7 @@ async function main() {
     for (const target of sendableTargets) {
       console.log("---");
       console.log(`模拟发送给：${target.name} (${target.dingtalkUserId})`);
-      console.log(buildReminderContent(target.name, round, date));
+      console.log(buildReminderContent(target.name, round, date, meal));
     }
     return;
   }
@@ -130,7 +179,7 @@ async function main() {
   for (const target of sendableTargets) {
     await sendDingtalkWorkNotice(config, accessToken, {
       userId: target.dingtalkUserId as string,
-      content: buildReminderContent(target.name, round, date),
+      content: buildReminderContent(target.name, round, date, meal),
     });
     console.log(`已发送：${target.name}`);
   }

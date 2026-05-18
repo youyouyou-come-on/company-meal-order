@@ -434,7 +434,7 @@ export default function Home() {
               emoji="🌙"
               title="晚餐"
               testId={`home-meal-${selectedDate}-dinner`}
-              cutoffText="截止 15:00"
+              cutoffText="截止 16:00"
               menu={getMenu(selectedDate, "dinner")}
               signups={getSignups(selectedDate, "dinner")}
               currentUserQuantity={getUserQuantity(selectedDate, "dinner")}

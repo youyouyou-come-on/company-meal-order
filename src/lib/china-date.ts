@@ -119,6 +119,6 @@ export function isMealExpired(dateStr: string, mealType: MealType, now = new Dat
   if (dateStr < today) return true;
   if (dateStr > today) return false;
 
-  const cutoffHour = mealType === "lunch" ? 10 : 15;
+  const cutoffHour = mealType === "lunch" ? 10 : 16;
   return getChinaHour(now) >= cutoffHour;
 }
