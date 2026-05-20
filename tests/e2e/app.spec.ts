@@ -4,6 +4,7 @@ import {
   getBusinessDateWeekday,
   getChinaWeekDates,
   getChinaWeekStart,
+  getChinaTodayString,
   getOrderableDates,
 } from "../../src/lib/china-date";
 
@@ -40,7 +41,10 @@ function nonOrderableFutureDate() {
 function visibleButNotOrderableDate() {
   const orderableDateSet = new Set(getOrderableDates());
   const visibleDates = [...getChinaWeekDates(0, 6), ...getChinaWeekDates(1, 6)];
-  const previewOnlyDate = visibleDates.find((date) => !orderableDateSet.has(date));
+  const today = getChinaTodayString();
+  const previewOnlyDate = visibleDates.find(
+    (date) => date > today && !orderableDateSet.has(date) && date !== getMondayFromDate(date)
+  );
 
   if (!previewOnlyDate) {
     throw new Error("找不到可展示但不可点餐的日期");
@@ -213,6 +217,11 @@ test("home keeps the weekly date layout but blocks ordering after the next order
   for (const date of orderableDates) {
     await openMealCard(page, date, "lunch");
   }
+
+  const previewWeekButtonName =
+    getMondayFromDate(previewOnlyDate) === nextWeekMondayIsoDate() ? "下周点餐" : "本周点餐";
+  await page.getByRole("button", { name: previewWeekButtonName }).click();
+  await expect(page.getByTestId(`home-day-tab-${previewOnlyDate}`)).toContainText("查看菜单");
 
   const nextMealCard = await openMealCard(page, nextOrderableDate(), "lunch");
   await expect(nextMealCard.getByTestId(`home-meal-${nextOrderableDate()}-lunch-confirm`)).toBeVisible();

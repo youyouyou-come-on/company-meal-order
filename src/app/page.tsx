@@ -309,6 +309,7 @@ export default function Home() {
             const isToday = date === today;
             const isSelected = date === selectedDate;
             const isExpiredDay = isDayExpired(date);
+            const isOrderableDay = orderableDates.includes(date);
             return (
               <button
                 type="button"
@@ -352,8 +353,10 @@ export default function Home() {
                     <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
                       今天
                     </span>
-                  ) : (
+                  ) : isOrderableDay ? (
                     <span className="text-xs font-medium text-gray-400">可点餐日</span>
+                  ) : (
+                    <span className="text-xs font-medium text-gray-400">查看菜单</span>
                   )}
                 </div>
               </button>
