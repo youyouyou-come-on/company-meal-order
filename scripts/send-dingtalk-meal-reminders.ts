@@ -55,7 +55,7 @@ function parseArgs() {
 
 function getReminderRoundLabel(round: ReminderRound, meal: ReminderMealScope) {
   if (meal === "dinner") {
-    return round === "second" ? "15 点 50 二次提醒" : "15 点半首次提醒";
+    return round === "second" ? "15 点 20 二次提醒" : "15 点首次提醒";
   }
 
   return round === "second" ? "9 点 50 二次提醒" : "9 点半首次提醒";
