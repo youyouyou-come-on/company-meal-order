@@ -9,12 +9,11 @@ import {
 } from "../src/lib/dingtalk";
 
 type ReminderRound = "first" | "second";
-type ReminderMealScope = "all" | "lunch" | "dinner";
+type ReminderMealScope = "lunch" | "dinner";
 
 const MIN_SUBMITTED_USERS_FOR_REMINDER = 5;
 
 const MEAL_SCOPE_LABELS: Record<ReminderMealScope, string> = {
-  all: "点餐",
   lunch: "午餐",
   dinner: "晚餐",
 };
@@ -43,7 +42,7 @@ function parseArgs() {
   const round: ReminderRound = roundValue === "second" ? "second" : "first";
   const mealValue = getValue("meal") || getValue("mealType");
   const meal: ReminderMealScope =
-    mealValue === "lunch" || mealValue === "dinner" ? mealValue : "all";
+    mealValue === "dinner" ? "dinner" : "lunch";
 
   return {
     date: getValue("date") || getChinaTodayString(),
@@ -62,10 +61,10 @@ function getReminderRoundLabel(round: ReminderRound, meal: ReminderMealScope) {
   return round === "second" ? "9 点 50 二次提醒" : "9 点半首次提醒";
 }
 
-function buildReminderContent(employeeName: string) {
+function buildReminderContent(employeeName: string, meal: ReminderMealScope) {
   const url = process.env["DINGTALK_REMINDER_URL"]?.trim() || "https://meal.zcgc.club";
 
-  return `${employeeName}，系统检查到你今天还没有提交点餐。\n\n如需点餐，请点击进入：${url}`;
+  return `${employeeName}，系统检查到您未点${MEAL_SCOPE_LABELS[meal]}。\n\n如需点餐，请点击进入：${url}`;
 }
 
 async function findActiveUsersWithSignups(date: string) {
@@ -84,10 +83,6 @@ async function findActiveUsersWithSignups(date: string) {
 }
 
 function hasSubmitted(user: ReminderTarget, meal: ReminderMealScope) {
-  if (meal === "all") {
-    return user.signups.length > 0;
-  }
-
   return user.signups.some((signup) => signup.mealType === meal);
 }
 
@@ -135,7 +130,7 @@ async function main() {
     for (const target of sendableTargets) {
       console.log("---");
       console.log(`模拟发送给：${target.name} (${target.dingtalkUserId})`);
-      console.log(buildReminderContent(target.name));
+      console.log(buildReminderContent(target.name, meal));
     }
     return;
   }
@@ -153,7 +148,7 @@ async function main() {
   for (const target of sendableTargets) {
     await sendDingtalkWorkNotice(config, accessToken, {
       userId: target.dingtalkUserId as string,
-      content: buildReminderContent(target.name),
+      content: buildReminderContent(target.name, meal),
     });
     console.log(`已发送：${target.name}`);
   }

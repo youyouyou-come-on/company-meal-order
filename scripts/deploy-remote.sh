@@ -464,8 +464,8 @@ if [[ "$ENABLE_DINGTALK_REMINDER" == "1" ]]; then
   cat >"$dingtalk_reminder_cron_file" <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-${dingtalk_reminder_first_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --round=first --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
-${dingtalk_reminder_second_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --round=second --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
+${dingtalk_reminder_first_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --meal=lunch --round=first --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
+${dingtalk_reminder_second_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --meal=lunch --round=second --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
 ${dingtalk_dinner_reminder_first_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --meal=dinner --round=first --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
 ${dingtalk_dinner_reminder_second_cron} root runuser -u ${app_user} -- bash -lc 'cd ${deploy_path} && set -a && . ${env_file} && set +a && pnpm exec tsx scripts/send-dingtalk-meal-reminders.ts --meal=dinner --round=second --live' >> /var/log/${service_name}-dingtalk-reminder.log 2>&1
 EOF
