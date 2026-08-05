@@ -13,6 +13,7 @@
 # testing
 /coverage
 /playwright-report
+/.playwright-cli/
 /test-results
 /playwright/.auth
 
@@ -60,3 +61,5 @@ next-env.d.ts
 # test artifacts
 cookies.txt
 .ace-tool/
+design-qa-assets/
+design-qa.md

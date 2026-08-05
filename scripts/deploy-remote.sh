@@ -169,16 +169,24 @@ encode_b64() {
 }
 
 SSH_TARGET="${DEPLOY_USER}@${DEPLOY_HOST}"
-SSH_ARGS=(-p "$DEPLOY_PORT" -o StrictHostKeyChecking=no)
+SSH_ARGS=(
+  -p "$DEPLOY_PORT"
+  -o StrictHostKeyChecking=no
+  -o ConnectTimeout=20
+  -o ServerAliveInterval=5
+  -o ServerAliveCountMax=1
+  -o IPQoS=none
+)
 APP_DOMAINS="$(normalize_domains "$APP_DOMAINS")"
 PRIMARY_DOMAIN="${APP_DOMAINS%% *}"
 
 if [[ -n "$SSH_PASSWORD" ]]; then
+  SSH_ARGS+=(-o PreferredAuthentications=password -o PubkeyAuthentication=no)
   SSH_BASE=(sshpass -p "$SSH_PASSWORD" ssh "${SSH_ARGS[@]}" "$SSH_TARGET")
-  RSYNC_RSH="sshpass -p $(printf '%q' "$SSH_PASSWORD") ssh -p ${DEPLOY_PORT} -o StrictHostKeyChecking=no"
+  RSYNC_RSH="sshpass -p $(printf '%q' "$SSH_PASSWORD") ssh -p ${DEPLOY_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ServerAliveInterval=5 -o ServerAliveCountMax=1 -o IPQoS=none -o PreferredAuthentications=password -o PubkeyAuthentication=no"
 else
   SSH_BASE=(ssh "${SSH_ARGS[@]}" "$SSH_TARGET")
-  RSYNC_RSH="ssh -p ${DEPLOY_PORT} -o StrictHostKeyChecking=no"
+  RSYNC_RSH="ssh -p ${DEPLOY_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ServerAliveInterval=5 -o ServerAliveCountMax=1 -o IPQoS=none"
 fi
 
 TMP_DIR="$(mktemp -d)"

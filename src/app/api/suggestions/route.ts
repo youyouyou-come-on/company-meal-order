@@ -5,6 +5,10 @@ import { getSession } from "@/lib/session";
 export async function GET() {
   try {
     const session = await getSession();
+    if (!session.userId) {
+      return NextResponse.json({ error: "请先登录" }, { status: 401 });
+    }
+
     const suggestions = await prisma.dishSuggestion.findMany({
       orderBy: { createdAt: "desc" },
       include: { user: { select: { id: true, name: true } } },
@@ -14,7 +18,8 @@ export async function GET() {
         id: s.id,
         content: s.content,
         createdAt: s.createdAt.toISOString(),
-        isMine: session.userId === s.user.id,
+        authorName: s.user.name,
+        isMine: session.userId === s.userId,
       })),
     });
   } catch {

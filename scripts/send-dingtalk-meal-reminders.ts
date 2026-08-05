@@ -11,7 +11,7 @@ import {
 type ReminderRound = "first" | "second";
 type ReminderMealScope = "lunch" | "dinner";
 
-const MIN_SUBMITTED_USERS_FOR_REMINDER = 5;
+const MIN_SUBMITTED_USERS_FOR_REMINDER = 1;
 
 const MEAL_SCOPE_LABELS: Record<ReminderMealScope, string> = {
   lunch: "午餐",
@@ -117,7 +117,7 @@ async function main() {
 
   if (!name && submittedUserCount < MIN_SUBMITTED_USERS_FOR_REMINDER) {
     console.log(
-      `今天已提交${MEAL_SCOPE_LABELS[meal]}员工少于 ${MIN_SUBMITTED_USERS_FOR_REMINDER} 人，可能是休假日，本轮不发送提醒。`
+      `今天还没有员工提交${MEAL_SCOPE_LABELS[meal]}，可能是休假日，本轮不发送提醒。`
     );
     return;
   }

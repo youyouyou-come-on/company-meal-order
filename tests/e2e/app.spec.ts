@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import {
   addBusinessDays,
   getBusinessDateWeekday,
@@ -8,7 +9,7 @@ import {
   getOrderableDates,
 } from "../../src/lib/china-date";
 
-const adminPassword = process.env.ADMIN_PASSWORD ?? "";
+const adminPassword = process.env.ADMIN_PASSWORD ?? "e2e-admin-password";
 const loginPassword = process.env.LOGIN_PASSWORD ?? "hzzcgc";
 const loginLockMaxFailedAttempts = Number.parseInt(
   process.env.LOGIN_LOCK_MAX_FAILED_ATTEMPTS ?? "10",
@@ -328,13 +329,21 @@ test("logged-in user can create a suggestion and it persists after reload", asyn
 
   const item = page.getByText(suggestionText, { exact: true });
   await expect(item).toBeVisible();
-  await expect(page.getByText("匿名同事")).toBeVisible();
+  const row = page.locator('[data-testid^="suggestion-item-"]').filter({ hasText: suggestionText });
+  await expect(row).toContainText(e2eUserName);
+  await expect(page.getByText(`将以“${e2eUserName}”的姓名提交`)).toBeVisible();
 
   await page.reload();
   await expect(page.getByText(suggestionText, { exact: true })).toBeVisible();
+  await expect(
+    page.locator('[data-testid^="suggestion-item-"]').filter({ hasText: suggestionText })
+  ).toContainText(e2eUserName);
 
-  const row = page.locator("div").filter({ has: item }).first();
-  await row.getByRole("button", { name: "删除" }).click();
+  await page
+    .locator('[data-testid^="suggestion-item-"]')
+    .filter({ hasText: suggestionText })
+    .getByRole("button", { name: "删除" })
+    .click();
   await expect(item).not.toBeVisible();
 });
 
@@ -457,6 +466,99 @@ test("admin can save a menu and the saved value survives reload", async ({ page 
   }
 });
 
+test("admin can export a weekly CSV and atomically import menus across future weeks", async ({
+  page,
+}) => {
+  await login(page);
+  const currentWeekStart = getChinaWeekStart();
+  const nextWeekDate = nextWeekMondayIsoDate();
+  const followingWeekDate = addBusinessDays(nextWeekDate, 7);
+  const nextWeekStart = getMondayFromDate(nextWeekDate);
+  const followingWeekStart = getMondayFromDate(followingWeekDate);
+  const originalNextWeekMenu = (await getWeekMenus(page, nextWeekStart)).find(
+    (item) => item.date === nextWeekDate && item.mealType === "lunch"
+  );
+  const originalFollowingWeekMenu = (await getWeekMenus(page, followingWeekStart)).find(
+    (item) => item.date === followingWeekDate && item.mealType === "dinner"
+  );
+  const importedNextWeekDishes = `E2E下周导入-${Date.now()}，红烧排骨、清炒时蔬`;
+  const importedFollowingWeekDishes = `E2E下下周导入-${Date.now()}，土豆烧牛腩`;
+  const rejectedDishes = `不应写入-${Date.now()}`;
+
+  try {
+    await verifyAdmin(page);
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("admin-menu-export").click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe(
+      `menu-${currentWeekStart}-to-${addBusinessDays(currentWeekStart, 5)}.csv`
+    );
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    const exportedCsv = await readFile(downloadPath!, "utf8");
+    expect(exportedCsv.startsWith("\uFEFF日期,餐次,菜品")).toBeTruthy();
+    expect(exportedCsv).toContain(`${currentWeekStart},午餐,`);
+
+    const invalidCsv = [
+      "日期,餐次,菜品",
+      `${nextWeekDate},午餐,${rejectedDishes}`,
+      "2026-02-31,晚餐,无效日期菜单",
+    ].join("\r\n");
+    await page.getByTestId("admin-menu-import-input").setInputFiles({
+      name: "invalid-menu.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(invalidCsv, "utf8"),
+    });
+    await expect(page.getByTestId("admin-menu-import-status")).toContainText("第 3 行日期无效");
+    const menusAfterRejectedImport = await getWeekMenus(page, nextWeekStart);
+    expect(
+      menusAfterRejectedImport.find(
+        (item) => item.date === nextWeekDate && item.mealType === "lunch"
+      )?.dishes
+    ).toBe(originalNextWeekMenu?.dishes);
+
+    const validCsv = [
+      "日期,餐次,菜品",
+      `${nextWeekDate},午餐,"${importedNextWeekDishes}"`,
+      `${nextWeekDate},晚餐,`,
+      `${followingWeekDate},晚餐,"${importedFollowingWeekDishes}"`,
+    ].join("\r\n");
+    await page.getByTestId("admin-menu-import-input").setInputFiles({
+      name: "weekly-menu.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(`\uFEFF${validCsv}`, "utf8"),
+    });
+    await expect(page.getByTestId("admin-menu-import-status")).toContainText(
+      "导入成功，共新增或更新 2 条菜单"
+    );
+
+    await page.getByRole("button", { name: "下一周 →" }).click();
+    await expect(page.getByTestId(`meal-dishes-${nextWeekDate}-lunch`)).toContainText(
+      importedNextWeekDishes
+    );
+
+    await page.getByRole("button", { name: "下一周 →" }).click();
+    await expect(page.getByTestId(`meal-dishes-${followingWeekDate}-dinner`)).toContainText(
+      importedFollowingWeekDishes
+    );
+  } finally {
+    await verifyAdmin(page);
+    await setAdminMenuByApi(
+      page,
+      nextWeekDate,
+      "lunch",
+      originalNextWeekMenu?.dishes ?? null
+    );
+    await setAdminMenuByApi(
+      page,
+      followingWeekDate,
+      "dinner",
+      originalFollowingWeekMenu?.dishes ?? null
+    );
+  }
+});
+
 test("signup data persists after reload and re-login", async ({ page }) => {
   await login(page);
   const targetDate = nextOrderableDate();
@@ -482,15 +584,21 @@ test("signup data persists after reload and re-login", async ({ page }) => {
   await expect(mealCard).not.toContainText(`${e2eUserName} × 2`);
 });
 
-test("guest can browse suggestions but must login before signing up", async ({ page }) => {
+test("guest must login before viewing suggestions or signing up", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "请先登录" }).first()).toBeVisible();
   await page.getByRole("button", { name: "请先登录" }).first().click();
   await expect(page).toHaveURL(/\/login$/);
 
   await page.goto("/suggestions");
-  await expect(page.getByText("登录后可以匿名提交建议哦")).toBeVisible();
+  await expect(page.getByTestId("suggestion-login-required")).toContainText(
+    "建议专区仅限登录员工查看和实名提交"
+  );
   await expect(page.getByTestId("suggestion-input")).not.toBeVisible();
+
+  const suggestionsResponse = await page.request.get("/api/suggestions");
+  expect(suggestionsResponse.status()).toBe(401);
+  await expect(suggestionsResponse.json()).resolves.toMatchObject({ error: "请先登录" });
 });
 
 test("signup api rejects dates outside today and the next orderable day", async ({ page }) => {

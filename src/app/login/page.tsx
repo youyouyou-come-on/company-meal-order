@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { LockKey, SignIn, SpinnerGap, User } from "@phosphor-icons/react";
+import BrandMark from "@/components/BrandMark";
 
 export default function LoginPage() {
   const [name, setName] = useState("");
@@ -36,18 +38,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-lg border border-orange-100">
-        <div className="mb-6 text-center">
-          <div className="text-5xl mb-3">🍽️</div>
-          <h1 className="text-2xl font-bold text-gray-800">广众&众创内部点餐系统</h1>
-          <p className="mt-1 text-sm text-amber-600">输入姓名和公共密码后进入点餐</p>
+    <div className="page-enter flex min-h-[calc(100vh-72px)] items-center justify-center bg-[#f7f5ef] px-4 py-8">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-stone-300 bg-white shadow-[0_24px_70px_rgba(21,21,21,0.14)]">
+        <div className="bg-[#151515] px-6 py-6 text-white sm:px-8">
+          <BrandMark inverse />
+          <h1 className="sr-only">广众&众创内部点餐系统</h1>
+          <h2 className="mt-8 text-3xl font-black tracking-tight">员工登录</h2>
+          <p className="mt-2 text-sm font-bold text-stone-400">输入姓名和公共密码后进入点餐</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5 p-6 sm:p-8">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              👤 姓名
+            <label className="mb-2 flex items-center gap-2 text-sm font-black text-stone-800">
+              <User size={18} weight="bold" aria-hidden="true" />
+              姓名
             </label>
             <input
               type="text"
@@ -56,13 +60,14 @@ export default function LoginPage() {
               placeholder="请输入你的姓名"
               autoComplete="username"
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-orange-200 bg-orange-50/50 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 transition-colors"
+              className="ui-focus min-h-12 w-full rounded-xl border border-stone-300 bg-stone-50 px-4 text-stone-950 placeholder:text-stone-400 focus:border-[#f5c518] focus:bg-white focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              🔐 登录密码
+            <label className="mb-2 flex items-center gap-2 text-sm font-black text-stone-800">
+              <LockKey size={18} weight="bold" aria-hidden="true" />
+              登录密码
             </label>
             <input
               type="password"
@@ -71,21 +76,33 @@ export default function LoginPage() {
               placeholder="请输入公共密码"
               autoComplete="current-password"
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-orange-200 bg-orange-50/50 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 transition-colors"
+              className="ui-focus min-h-12 w-full rounded-xl border border-stone-300 bg-stone-50 px-4 text-stone-950 placeholder:text-stone-400 focus:border-[#f5c518] focus:bg-white focus:outline-none"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-2">{error}</p>
+            <p role="alert" className="status-pop rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              {error}
+            </p>
           )}
 
           <button
             type="submit"
             data-testid="login-submit"
             disabled={loading || !name.trim() || !password.trim()}
-            className="w-full rounded-xl bg-amber-500 px-4 py-3 text-white font-bold text-base hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+            className="gold-button ui-press ui-focus flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-black disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "登录中..." : "🍚 开始点餐"}
+            {loading ? (
+              <>
+                <SpinnerGap size={20} weight="bold" className="animate-spin" aria-hidden="true" />
+                登录中...
+              </>
+            ) : (
+              <>
+                <SignIn size={20} weight="bold" aria-hidden="true" />
+                开始点餐
+              </>
+            )}
           </button>
         </form>
       </div>

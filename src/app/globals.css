@@ -1,8 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fff8f0;
-  --foreground: #3d2c1e;
+  --background: #f7f5ef;
+  --foreground: #151515;
+  --surface: #ffffff;
+  --surface-muted: #efede7;
+  --ink: #151515;
+  --ink-soft: #2b2b29;
+  --muted: #5f5b52;
+  --line: #d8d5cc;
+  --gold: #f5c518;
+  --gold-strong: #e8b600;
+  --gold-ink: #6e5500;
+  --success: #16855b;
+  --danger: #c83c3c;
+  --shadow-soft: 0 12px 30px rgb(21 21 21 / 8%);
+  --shadow-lifted: 0 20px 54px rgb(21 21 21 / 16%);
 }
 
 @theme inline {
@@ -12,15 +25,180 @@
   --font-mono: "SFMono-Regular", "Menlo", "Consolas", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #1a1410;
-    --foreground: #f5e6d3;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  min-width: 320px;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a {
+  touch-action: manipulation;
+}
+
+.ui-press {
+  transition:
+    transform 110ms cubic-bezier(0.2, 0, 0, 1),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease;
+}
+
+.ui-press:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.ui-focus:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.gold-button {
+  background: var(--gold);
+  color: var(--ink);
+  border: 1px solid var(--gold);
+  box-shadow: 0 8px 20px rgb(245 197 24 / 22%);
+}
+
+.gold-button:hover:not(:disabled) {
+  background: #ffd327;
+  border-color: #ffd327;
+}
+
+.ink-button {
+  background: var(--ink);
+  color: #ffffff;
+  border: 1px solid var(--ink);
+}
+
+.ink-button:hover:not(:disabled) {
+  background: #2c2c2a;
+}
+
+.outline-button {
+  background: #ffffff;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+}
+
+.outline-button:hover:not(:disabled) {
+  background: #f0eee8;
+}
+
+.danger-button {
+  background: #fff5f3;
+  color: var(--danger);
+  border: 1px solid #f1c3bd;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #ffe9e5;
+}
+
+.surface-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
+}
+
+.page-enter {
+  animation: page-enter 220ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.content-swap {
+  animation: content-swap 190ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.modal-backdrop {
+  animation: modal-backdrop-in 160ms ease-out both;
+}
+
+.modal-panel {
+  animation: modal-panel-in 220ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.status-pop {
+  animation: status-pop 220ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes content-swap {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes status-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-lift:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .ui-press:active:not(:disabled),
+  .ui-lift:hover:not(:disabled) {
+    transform: none;
+  }
 }

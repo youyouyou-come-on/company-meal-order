@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { FloppyDisk, MagnifyingGlass, SpinnerGap, UserPlus } from "@phosphor-icons/react";
 
 interface Employee {
   id: number;
@@ -145,20 +146,20 @@ export default function EmployeeManagementPanel() {
   return (
     <section
       data-testid="admin-employee-panel"
-      className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-md print:hidden"
+      className="rounded-2xl border border-stone-300 bg-white p-5 shadow-[0_16px_40px_rgba(21,21,21,0.08)] print:hidden sm:p-6"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs font-black tracking-[0.24em] text-amber-600">EMPLOYEES</p>
+          <p className="text-xs font-black tracking-[0.24em] text-[#866800]">EMPLOYEES</p>
           <h2 className="mt-2 text-2xl font-black text-stone-900">员工管理</h2>
           <p className="mt-2 text-sm font-semibold text-stone-500">
             新同事直接在这里添加；离职或误加的员工先停用，历史点餐记录会保留。
           </p>
         </div>
-        <div className="flex gap-3 rounded-2xl bg-stone-100 px-4 py-3 text-sm font-black text-stone-700">
+        <div className="flex gap-3 rounded-xl bg-[#151515] px-4 py-3 text-sm font-black text-white">
           <span>启用 {activeEmployeeCount} 人</span>
-          <span className="text-stone-400">/</span>
-          <span>停用 {inactiveEmployeeCount} 人</span>
+          <span className="text-stone-600">/</span>
+          <span className="text-[#f5c518]">停用 {inactiveEmployeeCount} 人</span>
         </div>
       </div>
 
@@ -173,44 +174,55 @@ export default function EmployeeManagementPanel() {
             }
           }}
           placeholder="输入员工姓名，如：郭丽阳"
-          className="min-w-0 flex-1 rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-800 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+          className="ui-focus min-h-12 min-w-0 flex-1 rounded-xl border border-stone-300 bg-stone-50 px-4 text-sm font-bold text-stone-900 focus:border-[#f5c518] focus:bg-white focus:outline-none"
         />
         <input
           value={newEmployeeDingtalkUserId}
           data-testid="admin-employee-new-dingtalk-input"
           onChange={(event) => setNewEmployeeDingtalkUserId(event.target.value)}
           placeholder="钉钉 UserId，可稍后补"
-          className="min-w-0 flex-1 rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-800 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+          className="ui-focus min-h-12 min-w-0 flex-1 rounded-xl border border-stone-300 bg-stone-50 px-4 text-sm font-bold text-stone-900 focus:border-[#f5c518] focus:bg-white focus:outline-none"
         />
         <button
           type="button"
           data-testid="admin-employee-add"
           onClick={addEmployee}
           disabled={employeeSaving || !newEmployeeName.trim()}
-          className="rounded-2xl bg-stone-900 px-5 py-3 text-sm font-black text-white transition-colors hover:bg-stone-700 disabled:opacity-50"
+          className="gold-button ui-press ui-focus flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 text-sm font-black disabled:opacity-50"
         >
-          {employeeSaving ? "添加中..." : "添加员工"}
+          {employeeSaving ? (
+            <>
+              <SpinnerGap size={19} weight="bold" className="animate-spin" aria-hidden="true" />
+              添加中...
+            </>
+          ) : (
+            <>
+              <UserPlus size={19} weight="bold" aria-hidden="true" />
+              添加员工
+            </>
+          )}
         </button>
       </div>
 
       {employeeMessage && (
-        <p className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+        <p role="status" className="status-pop mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
           {employeeMessage}
         </p>
       )}
       {employeeError && (
-        <p className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+        <p role="alert" className="status-pop mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
           {employeeError}
         </p>
       )}
 
-      <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-3">
+      <div className="mt-5 rounded-xl border border-stone-200 bg-stone-50 p-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
             <label
               htmlFor="employee-search"
-              className="mb-1 block text-xs font-black tracking-[0.18em] text-stone-500"
+              className="mb-2 flex items-center gap-2 text-xs font-black tracking-[0.12em] text-stone-500"
             >
+              <MagnifyingGlass size={16} weight="bold" aria-hidden="true" />
               查询员工
             </label>
             <input
@@ -219,7 +231,7 @@ export default function EmployeeManagementPanel() {
               data-testid="admin-employee-search-input"
               onChange={(event) => setEmployeeSearch(event.target.value)}
               placeholder="输入姓名快速查询，如：张小龙"
-              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-800 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="ui-focus min-h-12 w-full rounded-xl border border-stone-300 bg-white px-4 text-sm font-bold text-stone-900 focus:border-[#f5c518] focus:outline-none"
             />
           </div>
           <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
@@ -234,7 +246,7 @@ export default function EmployeeManagementPanel() {
                 type="button"
                 data-testid="admin-employee-search-clear"
                 onClick={() => setEmployeeSearch("")}
-                className="rounded-xl bg-white px-3 py-2 text-xs font-black text-amber-700 shadow-sm transition-colors hover:bg-amber-50"
+                className="outline-button ui-press ui-focus min-h-10 rounded-xl px-3 text-xs font-black"
               >
                 清空查询
               </button>
@@ -248,13 +260,16 @@ export default function EmployeeManagementPanel() {
         className="mt-5 grid max-h-[360px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3"
       >
           {employeesLoading ? (
-          <p className="text-sm font-semibold text-stone-400">员工加载中...</p>
+          <p className="flex items-center gap-2 text-sm font-bold text-stone-400">
+            <SpinnerGap size={18} weight="bold" className="animate-spin" aria-hidden="true" />
+            员工加载中...
+          </p>
         ) : visibleEmployees.length > 0 ? (
           visibleEmployees.map((employee) => (
             <div
               key={employee.id}
               data-testid="admin-employee-row"
-              className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3"
+              className="rounded-xl border border-stone-200 bg-white px-4 py-3 transition-colors hover:border-stone-300 hover:bg-stone-50"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -276,8 +291,8 @@ export default function EmployeeManagementPanel() {
                   disabled={employeeUpdatingId === employee.id}
                   className={
                     employee.isActive
-                      ? "shrink-0 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
-                      : "shrink-0 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-600 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                      ? "danger-button ui-press ui-focus min-h-10 shrink-0 rounded-xl px-3 text-xs font-black disabled:opacity-50"
+                      : "ui-press ui-focus min-h-10 shrink-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
                   }
                 >
                   {employeeUpdatingId === employee.id
@@ -302,7 +317,7 @@ export default function EmployeeManagementPanel() {
                       }))
                     }
                     placeholder="未绑定"
-                    className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-800 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="ui-focus min-h-10 min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 text-xs font-bold text-stone-900 focus:border-[#f5c518] focus:outline-none"
                   />
                   <button
                     type="button"
@@ -313,8 +328,9 @@ export default function EmployeeManagementPanel() {
                       (dingtalkUserIdEdits[employee.id] || "").trim() ===
                         (employee.dingtalkUserId || "")
                     }
-                    className="shrink-0 rounded-xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                    className="gold-button ui-press ui-focus flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-black disabled:opacity-50"
                   >
+                    <FloppyDisk size={15} weight="bold" aria-hidden="true" />
                     保存
                   </button>
                 </div>
@@ -324,7 +340,7 @@ export default function EmployeeManagementPanel() {
         ) : (
           <p
             data-testid="admin-employee-search-empty"
-            className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-center text-sm font-semibold text-stone-400 sm:col-span-2 xl:col-span-3"
+            className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-center text-sm font-bold text-stone-400 sm:col-span-2 xl:col-span-3"
           >
             没有找到匹配的员工
           </p>

@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { LockKey, SpinnerGap } from "@phosphor-icons/react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface AdminAccessGateProps {
@@ -58,8 +59,11 @@ export default function AdminAccessGate({ children }: AdminAccessGateProps) {
 
   if (userLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-orange-50/30">
-        <p className="text-gray-400">加载中...</p>
+      <div className="flex min-h-[calc(100vh-72px)] items-center justify-center bg-[#f7f5ef]">
+        <p className="flex items-center gap-2 text-sm font-bold text-stone-500">
+          <SpinnerGap size={20} weight="bold" className="animate-spin" aria-hidden="true" />
+          加载中...
+        </p>
       </div>
     );
   }
@@ -68,11 +72,16 @@ export default function AdminAccessGate({ children }: AdminAccessGateProps) {
 
   if (!adminVerified) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-orange-50/30">
-        <div className="w-full max-w-sm rounded-2xl border border-orange-100 bg-white p-8 shadow-lg">
-          <h2 className="mb-6 text-center text-xl font-bold text-gray-800">
-            管理员验证
-          </h2>
+      <div className="page-enter flex min-h-[calc(100vh-72px)] items-center justify-center bg-[#f7f5ef] px-4 py-8">
+        <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-stone-300 bg-white shadow-[0_24px_70px_rgba(21,21,21,0.14)]">
+          <div className="bg-[#151515] px-6 py-6 text-white">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5c518] text-[#151515]">
+              <LockKey size={26} weight="fill" aria-hidden="true" />
+            </div>
+            <h2 className="mt-5 text-2xl font-black">管理员验证</h2>
+            <p className="mt-2 text-sm font-bold text-stone-400">请输入管理员密码继续</p>
+          </div>
+          <div className="p-6">
           <input
             type="password"
             value={password}
@@ -84,19 +93,29 @@ export default function AdminAccessGate({ children }: AdminAccessGateProps) {
               }
             }}
             placeholder="请输入管理员密码"
-            className="mb-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-700 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            className="ui-focus mb-4 min-h-12 w-full rounded-xl border border-stone-300 bg-stone-50 px-4 text-sm font-bold text-stone-900 focus:border-[#f5c518] focus:bg-white focus:outline-none"
           />
           {verifyError && (
-            <p className="mb-4 text-center text-sm text-red-500">{verifyError}</p>
+            <p role="alert" className="status-pop mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm font-bold text-red-700">
+              {verifyError}
+            </p>
           )}
           <button
             onClick={handleVerifyPassword}
             data-testid="admin-password-submit"
             disabled={verifying || !password}
-            className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-medium text-white shadow-md transition-colors hover:bg-amber-600 disabled:opacity-50"
+            className="gold-button ui-press ui-focus flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-black disabled:opacity-50"
           >
-            {verifying ? "验证中..." : "确认"}
+            {verifying ? (
+              <>
+                <SpinnerGap size={19} weight="bold" className="animate-spin" aria-hidden="true" />
+                验证中...
+              </>
+            ) : (
+              "确认"
+            )}
           </button>
+          </div>
         </div>
       </div>
     );

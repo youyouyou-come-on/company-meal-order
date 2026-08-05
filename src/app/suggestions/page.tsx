@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { Lightbulb, PaperPlaneTilt, SpinnerGap, Trash } from "@phosphor-icons/react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface Suggestion {
   id: number;
   content: string;
   createdAt: string;
+  authorName: string;
   isMine: boolean;
 }
 
@@ -25,11 +28,12 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function SuggestionsPage() {
-  const { user } = useCurrentUser();
+  const { user, loading: userLoading } = useCurrentUser();
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const fetchSuggestions = useCallback(async () => {
     try {
@@ -42,13 +46,18 @@ export default function SuggestionsPage() {
   }, []);
 
   useEffect(() => {
-    fetchSuggestions();
-  }, [fetchSuggestions]);
+    if (user) {
+      void fetchSuggestions();
+    } else if (!userLoading) {
+      setSuggestions([]);
+    }
+  }, [fetchSuggestions, user, userLoading]);
 
   async function handleSubmit() {
     if (!content.trim()) return;
     setSubmitting(true);
     setError("");
+    setSuccess("");
     try {
       const res = await fetch("/api/suggestions", {
         method: "POST",
@@ -61,7 +70,8 @@ export default function SuggestionsPage() {
         return;
       }
       setContent("");
-      fetchSuggestions();
+      setSuccess("建议已提交");
+      await fetchSuggestions();
     } catch {
       setError("提交失败，请重试");
     } finally {
@@ -85,30 +95,39 @@ export default function SuggestionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50">
-      <main className="mx-auto max-w-2xl px-4 py-8">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-amber-800">
-            📝 建议专区
-          </h1>
-          <p className="mt-2 text-amber-600">
-            前台匿名展示，后台会保留提交记录
+    <div className="min-h-screen bg-[#f7f5ef]">
+      <main className="page-enter mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mb-6 rounded-2xl bg-[#151515] px-6 py-6 text-white shadow-xl sm:px-8">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5c518] text-[#151515]">
+            <Lightbulb size={27} weight="fill" aria-hidden="true" />
+          </div>
+          <h1 className="mt-5 text-3xl font-black tracking-tight">建议专区</h1>
+          <p className="mt-2 text-sm font-bold text-stone-400">
+            实名提出建议，让每条反馈都更清楚
           </p>
         </div>
 
-        {/* Input area */}
-        {user ? (
-          <div className="mb-8 rounded-2xl bg-white p-6 shadow-sm">
-            <div className="flex gap-3">
+        {userLoading ? (
+          <div className="surface-card mb-6 rounded-2xl p-6 text-center">
+            <p className="flex items-center justify-center gap-2 text-sm font-bold text-stone-500">
+              <SpinnerGap size={19} weight="bold" className="animate-spin" aria-hidden="true" />
+              正在确认登录状态...
+            </p>
+          </div>
+        ) : user ? (
+          <div className="surface-card mb-6 rounded-2xl p-5 sm:p-6">
+            <p className="mb-3 text-sm font-black text-[#6e5500]">
+              将以“{user.name}”的姓名提交
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row">
               <input
                 type="text"
                 value={content}
                 data-testid="suggestion-input"
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="匿名提建议，比如：想吃糖醋排骨"
+                placeholder="实名提建议，比如：想吃糖醋排骨"
                 maxLength={100}
-                className="flex-1 rounded-xl border border-amber-200 px-4 py-3 text-gray-800 placeholder-gray-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                className="ui-focus min-h-12 min-w-0 flex-1 rounded-xl border border-stone-300 bg-stone-50 px-4 font-bold text-stone-900 placeholder:text-stone-400 focus:border-[#f5c518] focus:bg-white focus:outline-none"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !submitting) handleSubmit();
                 }}
@@ -117,62 +136,84 @@ export default function SuggestionsPage() {
                 onClick={handleSubmit}
                 data-testid="suggestion-submit"
                 disabled={submitting || !content.trim()}
-                className="rounded-xl bg-amber-500 px-6 py-3 font-medium text-white hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="gold-button ui-press ui-focus flex min-h-12 items-center justify-center gap-2 rounded-xl px-6 font-black disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {submitting ? "提交中..." : "匿名提交"}
+                {submitting ? (
+                  <>
+                    <SpinnerGap size={19} weight="bold" className="animate-spin" aria-hidden="true" />
+                    提交中...
+                  </>
+                ) : (
+                  <>
+                    <PaperPlaneTilt size={19} weight="bold" aria-hidden="true" />
+                    提交建议
+                  </>
+                )}
               </button>
             </div>
-            <div className="mt-2 flex justify-between text-xs text-gray-400">
-              <span>{error && <span className="text-red-500">{error}</span>}</span>
+            <div className="mt-3 flex justify-between text-xs font-bold text-stone-400">
+              <span>
+                {error ? <span role="alert" className="text-red-600">{error}</span> : null}
+                {success ? <span role="status" className="status-pop text-[#16855b]">{success}</span> : null}
+              </span>
               <span>{content.length}/100</span>
             </div>
           </div>
         ) : (
-          <div className="mb-8 rounded-2xl bg-white p-6 text-center shadow-sm">
-            <p className="text-gray-500">登录后可以匿名提交建议哦 🔑</p>
+          <div
+            data-testid="suggestion-login-required"
+            className="surface-card mb-6 rounded-2xl p-8 text-center"
+          >
+            <p className="font-black text-stone-800">建议专区仅限登录员工查看和实名提交</p>
+            <Link
+              href="/login"
+              className="gold-button ui-press ui-focus mt-4 inline-flex min-h-11 items-center rounded-xl px-5 text-sm font-black"
+            >
+              去登录
+            </Link>
           </div>
         )}
 
-        {/* Suggestions list */}
-        {suggestions.length === 0 ? (
-          <div className="rounded-2xl bg-white p-12 text-center shadow-sm">
-            <p className="text-lg text-gray-400">
+        {!userLoading && user && suggestions.length === 0 ? (
+          <div className="surface-card rounded-2xl p-12 text-center">
+            <p className="text-lg font-bold text-stone-400">
               还没有建议，快来第一个提交吧！
             </p>
           </div>
-        ) : (
-          <div className="space-y-3">
+        ) : user ? (
+          <div className="overflow-hidden rounded-2xl border border-stone-300 bg-white shadow-[0_12px_30px_rgba(21,21,21,0.08)]">
             {suggestions.map((s) => (
               <div
                 key={s.id}
                 data-testid={`suggestion-item-${s.id}`}
-                className="flex items-center justify-between rounded-2xl bg-white px-5 py-4 shadow-sm"
+                className="flex items-center justify-between border-b border-stone-200 px-5 py-4 last:border-b-0"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700">
-                    匿
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#151515] text-sm font-black text-[#f5c518]">
+                    {Array.from(s.authorName)[0]}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-gray-800 font-medium truncate">
+                    <p className="truncate font-bold text-stone-900">
                       {s.content}
                     </p>
-                    <p className="text-xs text-gray-400">
-                      匿名同事 · {timeAgo(s.createdAt)}
+                    <p className="mt-1 text-xs font-bold text-stone-400">
+                      {s.authorName} · {timeAgo(s.createdAt)}
                     </p>
                   </div>
                 </div>
                 {user && s.isMine && (
                   <button
                     onClick={() => handleDelete(s.id)}
-                    className="ml-3 shrink-0 rounded-lg px-3 py-1 text-xs text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    aria-label={`删除${s.authorName}的建议`}
+                    className="danger-button ui-press ui-focus ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
                   >
-                    删除
+                    <Trash size={18} weight="bold" aria-hidden="true" />
                   </button>
                 )}
               </div>
             ))}
           </div>
-        )}
+        ) : null}
       </main>
     </div>
   );
