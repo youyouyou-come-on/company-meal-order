@@ -252,6 +252,13 @@ rsync -az --delete \
   --exclude 'playwright-report' \
   --exclude 'test-results' \
   --exclude 'coverage' \
+  --exclude '.ace-tool' \
+  --exclude '.playwright-cli' \
+  --exclude 'dev.db' \
+  --exclude '*.tsbuildinfo' \
+  --exclude 'next-env.d.ts' \
+  --exclude 'cookies.txt' \
+  --exclude '.DS_Store' \
   --exclude 'design-qa.md' \
   --exclude 'design-qa-assets' \
   "$ROOT_DIR/" \
