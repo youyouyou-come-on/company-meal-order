@@ -3,10 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { businessDateToUtcDate } from "@/lib/china-date";
 import { MenuCsvValidationError, parseMenuCsv } from "@/lib/menu-csv";
+import { parseMenuWorkbook } from "@/lib/menu-excel";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const MAX_FILE_SIZE = 1024 * 1024;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,13 +23,24 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file");
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "请选择 CSV 文件" }, { status: 400 });
+      return NextResponse.json({ error: "请选择 Excel 或 CSV 文件" }, { status: 400 });
     }
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "CSV 文件不能超过 1MB" }, { status: 400 });
+      return NextResponse.json({ error: "菜单文件不能超过 5MB" }, { status: 400 });
     }
 
-    const entries = parseMenuCsv(await file.text());
+    const lowerName = file.name.toLowerCase();
+    let entries;
+    if (lowerName.endsWith(".xlsx")) {
+      entries = await parseMenuWorkbook(await file.arrayBuffer());
+    } else if (lowerName.endsWith(".csv")) {
+      entries = parseMenuCsv(await file.text());
+    } else {
+      return NextResponse.json(
+        { error: "仅支持 .xlsx 或 .csv 格式的菜单文件" },
+        { status: 400 }
+      );
+    }
 
     await prisma.$transaction(async (transaction) => {
       for (const entry of entries) {

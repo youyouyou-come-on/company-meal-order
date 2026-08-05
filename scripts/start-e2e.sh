@@ -9,7 +9,6 @@ TEST_DB="$RUNTIME_DIR/e2e.db"
 PORT="${PORT:-3100}"
 PRISMA_BIN="$ROOT_DIR/node_modules/.bin/prisma"
 NEXT_BIN="$ROOT_DIR/node_modules/.bin/next"
-BUILD_ID_FILE="$ROOT_DIR/.next/BUILD_ID"
 
 export PATH="$ROOT_DIR/node_modules/.bin:$PATH"
 
@@ -57,10 +56,8 @@ env \
   "$PRISMA_BIN" db seed
 
 cd "$ROOT_DIR"
-if [[ ! -f "$BUILD_ID_FILE" ]]; then
-  echo "Production build not found, building the app for E2E..."
-  "$NEXT_BIN" build
-fi
+echo "Building the current source for E2E..."
+"$NEXT_BIN" build
 
 exec env \
   PORT="$PORT" \

@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { strFromU8, unzipSync } from "fflate";
 import {
   addBusinessDays,
   getBusinessDateWeekday,
@@ -8,6 +9,7 @@ import {
   getChinaTodayString,
   getOrderableDates,
 } from "../../src/lib/china-date";
+import { createMenuWorkbook } from "../../src/lib/menu-excel";
 
 const adminPassword = process.env.ADMIN_PASSWORD ?? "e2e-admin-password";
 const loginPassword = process.env.LOGIN_PASSWORD ?? "hzzcgc";
@@ -466,7 +468,7 @@ test("admin can save a menu and the saved value survives reload", async ({ page 
   }
 });
 
-test("admin can export a weekly CSV and atomically import menus across future weeks", async ({
+test("admin can export a dated Excel file and atomically import menus across future weeks", async ({
   page,
 }) => {
   await login(page);
@@ -491,14 +493,27 @@ test("admin can export a weekly CSV and atomically import menus across future we
     const downloadPromise = page.waitForEvent("download");
     await page.getByTestId("admin-menu-export").click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toBe(
-      `menu-${currentWeekStart}-to-${addBusinessDays(currentWeekStart, 5)}.csv`
-    );
+    expect(download.suggestedFilename()).toBe(`${getChinaTodayString()}.xlsx`);
     const downloadPath = await download.path();
     expect(downloadPath).not.toBeNull();
-    const exportedCsv = await readFile(downloadPath!, "utf8");
-    expect(exportedCsv.startsWith("\uFEFF日期,餐次,菜品")).toBeTruthy();
-    expect(exportedCsv).toContain(`${currentWeekStart},午餐,`);
+    const exportedFile = await readFile(downloadPath!);
+    const exportedFiles = unzipSync(exportedFile);
+    const workbookXml = strFromU8(exportedFiles["xl/workbook.xml"]);
+    const worksheetXml = strFromU8(exportedFiles["xl/worksheets/sheet1.xml"]);
+    const currentWeekEnd = addBusinessDays(currentWeekStart, 5);
+    const compactDate = (date: string, separator: string) =>
+      date.split("-").map(Number).join(separator);
+    const title = `${compactDate(currentWeekStart, ".")}-${compactDate(currentWeekEnd, ".")}一周菜单`;
+    expect(workbookXml).toContain('sheet name="菜单"');
+    expect(workbookXml).toContain("_xlnm.Print_Area");
+    expect(worksheetXml).toContain(`<t xml:space="preserve">${title}</t>`);
+    expect(worksheetXml).toContain("<t xml:space=\"preserve\">日期</t>");
+    expect(worksheetXml).toContain(
+      `<t xml:space="preserve">${compactDate(currentWeekStart, "-")}</t>`
+    );
+    expect(worksheetXml).toContain("<t xml:space=\"preserve\">中午</t>");
+    expect(worksheetXml).toContain('orientation="landscape"');
+    expect(worksheetXml).toContain('fitToWidth="1" fitToHeight="1"');
 
     const invalidCsv = [
       "日期,餐次,菜品",
@@ -518,30 +533,37 @@ test("admin can export a weekly CSV and atomically import menus across future we
       )?.dishes
     ).toBe(originalNextWeekMenu?.dishes);
 
-    const validCsv = [
-      "日期,餐次,菜品",
-      `${nextWeekDate},午餐,"${importedNextWeekDishes}"`,
-      `${nextWeekDate},晚餐,`,
-      `${followingWeekDate},晚餐,"${importedFollowingWeekDishes}"`,
-    ].join("\r\n");
+    const validWorkbookBuffer = createMenuWorkbook([
+      { date: nextWeekDate, mealType: "lunch", dishes: importedNextWeekDishes },
+      { date: nextWeekDate, mealType: "dinner", dishes: "" },
+      {
+        date: followingWeekDate,
+        mealType: "dinner",
+        dishes: importedFollowingWeekDishes,
+      },
+    ]);
     await page.getByTestId("admin-menu-import-input").setInputFiles({
-      name: "weekly-menu.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from(`\uFEFF${validCsv}`, "utf8"),
+      name: "weekly-menu.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer: validWorkbookBuffer,
     });
     await expect(page.getByTestId("admin-menu-import-status")).toContainText(
       "导入成功，共新增或更新 2 条菜单"
     );
 
     await page.getByRole("button", { name: "下一周 →" }).click();
-    await expect(page.getByTestId(`meal-dishes-${nextWeekDate}-lunch`)).toContainText(
-      importedNextWeekDishes
-    );
+    const importedNextWeekMenu = page.getByTestId(`meal-dishes-${nextWeekDate}-lunch`);
+    for (const dish of importedNextWeekDishes.split(/[，、]/)) {
+      await expect(importedNextWeekMenu).toContainText(dish);
+    }
 
     await page.getByRole("button", { name: "下一周 →" }).click();
-    await expect(page.getByTestId(`meal-dishes-${followingWeekDate}-dinner`)).toContainText(
-      importedFollowingWeekDishes
+    const importedFollowingWeekMenu = page.getByTestId(
+      `meal-dishes-${followingWeekDate}-dinner`
     );
+    for (const dish of importedFollowingWeekDishes.split(/[，、]/)) {
+      await expect(importedFollowingWeekMenu).toContainText(dish);
+    }
   } finally {
     await verifyAdmin(page);
     await setAdminMenuByApi(

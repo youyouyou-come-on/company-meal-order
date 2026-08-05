@@ -6,15 +6,17 @@ import {
   formatBusinessDate,
   getBusinessWeekRange,
   getChinaWeekStart,
+  getChinaTodayString,
 } from "@/lib/china-date";
 import {
   assertBusinessDate,
-  createMenuCsv,
   MenuCsvValidationError,
   type CsvMealType,
 } from "@/lib/menu-csv";
+import { createMenuWorkbook } from "@/lib/menu-excel";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,15 +52,16 @@ export async function GET(request: NextRequest) {
         dishes: menuBySlot.get(`${date}-${mealType}`) ?? "",
       }))
     );
-    const csv = createMenuCsv(rows);
-    const weekEnd = addBusinessDays(weekStart, 5);
+    const workbook = await createMenuWorkbook(rows);
+    const filename = `${getChinaTodayString()}.xlsx`;
 
-    return new NextResponse(csv, {
+    return new NextResponse(workbook, {
       status: 200,
       headers: {
         "Cache-Control": "no-store",
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="menu-${weekStart}-to-${weekEnd}.csv"`,
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {

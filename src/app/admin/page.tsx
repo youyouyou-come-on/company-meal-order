@@ -22,6 +22,7 @@ import {
   businessDateToUtcDate,
   formatDateLabel,
   getBusinessDateWeekday,
+  getChinaTodayString,
   getChinaWeekDates,
   getChinaWeekStart,
 } from "@/lib/china-date";
@@ -354,12 +355,12 @@ function AdminMenuContent() {
               </button>
               <a
                 href={`/api/admin/menus/export?weekStart=${encodeURIComponent(monday)}`}
-                download
+                download={`${getChinaTodayString()}.xlsx`}
                 data-testid="admin-menu-export"
                 className="outline-button ui-press ui-focus flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-black"
               >
                 <DownloadSimple size={18} weight="bold" aria-hidden="true" />
-                导出本周 CSV
+                导出本周 Excel
               </a>
               <button
                 type="button"
@@ -373,12 +374,12 @@ function AdminMenuContent() {
                 ) : (
                   <UploadSimple size={18} weight="bold" aria-hidden="true" />
                 )}
-                {importing ? "导入中..." : "导入菜单 CSV"}
+                {importing ? "导入中..." : "导入菜单文件"}
               </button>
               <input
                 ref={importInputRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                 data-testid="admin-menu-import-input"
                 className="hidden"
                 onChange={(event) => {
@@ -398,7 +399,7 @@ function AdminMenuContent() {
           </div>
           <div className="mt-4 border-t border-stone-100 pt-4">
             <p className="text-xs font-medium leading-6 text-stone-500">
-              可先导出当前周，用 Excel 填写后再导入，也支持在同一文件中填写下周和后续周日期。表头为“日期、餐次、菜品”；导入会新增或覆盖同日期同餐次菜单，空白菜品不会删除原菜单。
+              导出的 Excel 是适合打印的横向一周菜单，填写后可以直接导入；也兼容原三列表格和 CSV，并支持在同一文件中填写下周和后续周日期。导入会新增或覆盖同日期同餐次菜单，空白菜品不会删除原菜单。
             </p>
             {notice && (
               <p
