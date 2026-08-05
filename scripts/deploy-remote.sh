@@ -252,6 +252,8 @@ rsync -az --delete \
   --exclude 'playwright-report' \
   --exclude 'test-results' \
   --exclude 'coverage' \
+  --exclude 'design-qa.md' \
+  --exclude 'design-qa-assets' \
   "$ROOT_DIR/" \
   "${SSH_TARGET}:${DEPLOY_PATH}/"
 
