@@ -473,6 +473,12 @@ test("admin print view uses readable A4 landscape typography", async ({ page }) 
         dishes: getSize(".admin-print-dishes"),
         date: getSize(".admin-print-date"),
         mealHeading: getSize(".admin-print-meal-heading"),
+        dishLines:
+          document
+            .querySelector<HTMLElement>(".admin-print-dishes")
+            ?.textContent?.split("\n")
+            .map((dish) => dish.trim())
+            .filter(Boolean) ?? [],
         pageAnimation: getComputedStyle(
           document.querySelector<HTMLElement>(".admin-print-main")!
         ).animationName,
@@ -485,9 +491,10 @@ test("admin print view uses readable A4 landscape typography", async ({ page }) 
       };
     });
 
-    expect(printMetrics.dishes).toBeGreaterThanOrEqual(18.5);
-    expect(printMetrics.date).toBeGreaterThanOrEqual(16);
-    expect(printMetrics.mealHeading).toBeGreaterThanOrEqual(21);
+    expect(printMetrics.dishes).toBeGreaterThanOrEqual(26.5);
+    expect(printMetrics.date).toBeGreaterThanOrEqual(18.5);
+    expect(printMetrics.mealHeading).toBeGreaterThanOrEqual(25);
+    expect(printMetrics.dishLines).toEqual(["红烧排骨", "清炒时蔬", "番茄蛋汤"]);
     expect(printMetrics.pageAnimation).toBe("none");
     expect(printMetrics.pageOpacity).toBe("1");
     expect(printMetrics.pageSize.toLowerCase()).toContain("a4");

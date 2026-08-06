@@ -233,25 +233,24 @@ a {
   }
 
   .admin-print-header {
-    margin-bottom: 5mm;
-    padding: 3.5mm 5mm;
+    margin-bottom: 3mm;
+    padding: 2.5mm 4mm;
     border-radius: 4mm;
   }
 
   .admin-print-header-kicker {
-    font-size: 10pt;
-    line-height: 1.2;
+    display: none;
   }
 
   .admin-print-header-title {
-    margin-top: 1.5mm;
-    font-size: 26pt;
+    margin-top: 0;
+    font-size: 28pt;
     line-height: 1.1;
   }
 
   .admin-print-header-range {
     margin-top: 1.5mm;
-    font-size: 14pt;
+    font-size: 16pt;
     line-height: 1.25;
   }
 
@@ -261,7 +260,7 @@ a {
 
   .admin-print-corner {
     padding: 3.5mm 2mm;
-    font-size: 12pt;
+    font-size: 14pt;
     line-height: 1.2;
   }
 
@@ -270,13 +269,13 @@ a {
   }
 
   .admin-print-day-label {
-    font-size: 15pt;
+    font-size: 17pt;
     line-height: 1.15;
   }
 
   .admin-print-date {
     margin-top: 1.5mm;
-    font-size: 12pt;
+    font-size: 14pt;
     line-height: 1.2;
   }
 
@@ -285,36 +284,41 @@ a {
   }
 
   .admin-print-meal-heading {
-    font-size: 16pt;
+    font-size: 19pt;
     line-height: 1.2;
   }
 
   .admin-print-meal-caption {
-    font-size: 10pt;
-    line-height: 1.2;
+    display: none;
   }
 
   .admin-print-slot {
-    min-height: 52mm;
+    min-height: 46mm;
     padding: 3mm;
     break-inside: avoid;
   }
 
+  .admin-print-slot > div:first-child {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
   .admin-print-slot-label {
-    font-size: 11pt;
-    line-height: 1.2;
+    display: none;
   }
 
   .admin-print-dishes,
   .admin-print-editor {
-    font-size: 14pt;
-    line-height: 1.4;
+    font-size: 20pt;
+    font-weight: 700;
+    line-height: 1.35;
   }
 
   .admin-print-empty {
     height: auto;
-    min-height: 34mm;
-    font-size: 12pt;
+    min-height: 36mm;
+    font-size: 15pt;
     line-height: 1.35;
   }
 }

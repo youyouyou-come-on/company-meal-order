@@ -56,6 +56,14 @@ function getWeekDates(monday: string): string[] {
   return getChinaWeekDates(0, 6, businessDateToUtcDate(monday));
 }
 
+function formatPrintDishes(dishes: string) {
+  return dishes
+    .split(/[、，,；;\n]+/)
+    .map((dish) => dish.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
 export default function AdminPage() {
   return (
     <AdminAccessGate>
@@ -667,12 +675,20 @@ function MealSlot({
           )}
         </div>
         {menu ? (
-          <p
-            data-testid={`meal-dishes-${date}-${mealType}`}
-            className="admin-print-dishes whitespace-pre-wrap text-[15px] leading-8 text-stone-700"
-          >
-            {menu.dishes}
-          </p>
+          <>
+            <p
+              data-testid={`meal-dishes-${date}-${mealType}`}
+              className="whitespace-pre-wrap text-[15px] leading-8 text-stone-700 print:hidden"
+            >
+              {menu.dishes}
+            </p>
+            <p
+              data-testid={`meal-print-dishes-${date}-${mealType}`}
+              className="admin-print-dishes hidden whitespace-pre-line text-stone-900 print:block"
+            >
+              {formatPrintDishes(menu.dishes)}
+            </p>
+          </>
         ) : (
           <div className="admin-print-empty flex h-full min-h-[96px] items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50 text-center text-sm font-bold text-stone-400 print:min-h-[80px]">
             点击添加菜单
