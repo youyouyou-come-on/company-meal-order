@@ -4,9 +4,9 @@ import { getSession } from "@/lib/session";
 import {
   addBusinessDays,
   formatBusinessDate,
+  formatMenuExportFilename,
   getBusinessWeekRange,
   getChinaWeekStart,
-  getChinaTodayString,
 } from "@/lib/china-date";
 import {
   assertBusinessDate,
@@ -53,7 +53,10 @@ export async function GET(request: NextRequest) {
       }))
     );
     const workbook = await createMenuWorkbook(rows);
-    const filename = `${getChinaTodayString()}.xlsx`;
+    const filename = formatMenuExportFilename(
+      weekStart,
+      addBusinessDays(weekStart, 5)
+    );
 
     return new NextResponse(workbook, {
       status: 200,

@@ -98,6 +98,10 @@ export function formatDateLabel(dateStr: string) {
   };
 }
 
+export function formatMenuExportFilename(weekStart: string, weekEnd: string) {
+  return `${weekStart.replaceAll("-", ".")}-${weekEnd.replaceAll("-", ".")}.xlsx`;
+}
+
 export function getOrderableDates(date = new Date()) {
   const today = getChinaTodayString(date);
   const weekday = getBusinessDateWeekday(today);

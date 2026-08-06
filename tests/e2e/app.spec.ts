@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { strFromU8, unzipSync } from "fflate";
 import {
   addBusinessDays,
+  formatMenuExportFilename,
   getBusinessDateWeekday,
   getChinaWeekDates,
   getChinaWeekStart,
@@ -493,7 +494,12 @@ test("admin can export a dated Excel file and atomically import menus across fut
     const downloadPromise = page.waitForEvent("download");
     await page.getByTestId("admin-menu-export").click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toBe(`${getChinaTodayString()}.xlsx`);
+    expect(download.suggestedFilename()).toBe(
+      formatMenuExportFilename(
+        currentWeekStart,
+        addBusinessDays(currentWeekStart, 5)
+      )
+    );
     const downloadPath = await download.path();
     expect(downloadPath).not.toBeNull();
     const exportedFile = await readFile(downloadPath!);
@@ -514,6 +520,15 @@ test("admin can export a dated Excel file and atomically import menus across fut
     expect(worksheetXml).toContain("<t xml:space=\"preserve\">中午</t>");
     expect(worksheetXml).toContain('orientation="landscape"');
     expect(worksheetXml).toContain('fitToWidth="1" fitToHeight="1"');
+
+    await page.getByRole("button", { name: "下一周 →" }).click();
+    const nextWeekDownloadPromise = page.waitForEvent("download");
+    await page.getByTestId("admin-menu-export").click();
+    const nextWeekDownload = await nextWeekDownloadPromise;
+    expect(nextWeekDownload.suggestedFilename()).toBe(
+      formatMenuExportFilename(nextWeekStart, addBusinessDays(nextWeekStart, 5))
+    );
+    await page.getByRole("button", { name: "回到本周" }).click();
 
     const invalidCsv = [
       "日期,餐次,菜品",

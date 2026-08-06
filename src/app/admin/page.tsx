@@ -21,8 +21,8 @@ import {
   addBusinessDays,
   businessDateToUtcDate,
   formatDateLabel,
+  formatMenuExportFilename,
   getBusinessDateWeekday,
-  getChinaTodayString,
   getChinaWeekDates,
   getChinaWeekStart,
 } from "@/lib/china-date";
@@ -355,7 +355,7 @@ function AdminMenuContent() {
               </button>
               <a
                 href={`/api/admin/menus/export?weekStart=${encodeURIComponent(monday)}`}
-                download={`${getChinaTodayString()}.xlsx`}
+                download={formatMenuExportFilename(monday, saturdayDate)}
                 data-testid="admin-menu-export"
                 className="outline-button ui-press ui-focus flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-black"
               >
