@@ -260,8 +260,8 @@ function AdminMenuContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f5ef]">
-      <main className="page-enter mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
+    <div className="admin-print-page min-h-screen bg-[#f7f5ef]">
+      <main className="admin-print-main page-enter mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
         <div className="mb-6 rounded-2xl bg-[#151515] px-6 py-6 text-white shadow-xl print:hidden sm:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -281,11 +281,11 @@ function AdminMenuContent() {
           </div>
         </div>
 
-        <div className="mb-4 hidden rounded-[24px] border border-stone-300 bg-white px-5 py-4 print:block">
+        <div className="admin-print-header mb-4 hidden rounded-[24px] border border-stone-300 bg-white px-5 py-4 print:block">
           <div className="text-center">
-            <div className="text-xs font-bold tracking-[0.3em] text-stone-500">COMPANY MEAL MENU</div>
-            <h1 className="mt-2 text-3xl font-black text-stone-900">食堂周菜单</h1>
-            <p className="mt-2 text-base font-semibold text-stone-600">{weekLabel}</p>
+            <div className="admin-print-header-kicker text-xs font-bold tracking-[0.3em] text-stone-500">COMPANY MEAL MENU</div>
+            <h1 className="admin-print-header-title mt-2 text-3xl font-black text-stone-900">食堂周菜单</h1>
+            <p className="admin-print-header-range mt-2 text-base font-semibold text-stone-600">{weekLabel}</p>
           </div>
         </div>
 
@@ -432,9 +432,9 @@ function AdminMenuContent() {
           <div className="overflow-x-auto rounded-2xl border border-stone-300 bg-white shadow-[0_16px_40px_rgba(21,21,21,0.1)] print:overflow-visible print:rounded-[24px] print:border-stone-400 print:shadow-none">
             <div
               data-testid="admin-week-grid"
-              className="grid min-w-[1180px] grid-cols-[132px_repeat(6,minmax(174px,1fr))] print:min-w-0 print:grid-cols-[110px_repeat(6,minmax(0,1fr))]"
+              className="admin-print-grid grid min-w-[1180px] grid-cols-[132px_repeat(6,minmax(174px,1fr))] print:min-w-0"
             >
-              <div className="border-b border-r border-stone-300 bg-[#151515] px-4 py-5 text-center text-sm font-black tracking-[0.16em] text-white print:px-2 print:py-4">
+              <div className="admin-print-corner border-b border-r border-stone-300 bg-[#151515] px-4 py-5 text-center text-sm font-black tracking-[0.16em] text-white print:px-2 print:py-4">
                 餐次
               </div>
               {weekDates.map((dateStr) => {
@@ -443,18 +443,18 @@ function AdminMenuContent() {
                   <div
                     key={`header-${dateStr}`}
                     data-testid={`admin-day-${dateStr}`}
-                    className="border-b border-stone-300 bg-stone-50 px-4 py-5 text-center print:px-2 print:py-4"
+                    className="admin-print-day border-b border-stone-300 bg-stone-50 px-4 py-5 text-center print:px-2 print:py-4"
                   >
-                    <div className="text-xl font-black tracking-tight text-stone-900 print:text-lg">{dayLabel}</div>
-                    <div className="mt-1 text-sm font-bold text-stone-500 print:text-xs">{shortDate}</div>
+                    <div className="admin-print-day-label text-xl font-black tracking-tight text-stone-900">{dayLabel}</div>
+                    <div className="admin-print-date mt-1 text-sm font-bold text-stone-500">{shortDate}</div>
                   </div>
                 );
               })}
 
-              <div className="border-r border-stone-300 bg-[#fff9dc] px-4 py-8 text-center print:px-2">
+              <div className="admin-print-meal-label border-r border-stone-300 bg-[#fff9dc] px-4 py-8 text-center print:px-2">
                 <BowlFood size={36} weight="fill" className="mx-auto text-[#151515]" aria-hidden="true" />
-                <div className="mt-3 text-lg font-black text-stone-900 print:text-base">午餐</div>
-                <div className="mt-1 text-xs font-bold tracking-[0.2em] text-[#6e5500]">LUNCH</div>
+                <div className="admin-print-meal-heading mt-3 text-lg font-black text-stone-900">午餐</div>
+                <div className="admin-print-meal-caption mt-1 text-xs font-bold tracking-[0.2em] text-[#6e5500]">LUNCH</div>
               </div>
               {weekDates.map((dateStr) => (
                 <MealSlot
@@ -474,10 +474,10 @@ function AdminMenuContent() {
                 />
               ))}
 
-              <div className="border-r border-t border-stone-300 bg-stone-100 px-4 py-8 text-center print:px-2">
+              <div className="admin-print-meal-label border-r border-t border-stone-300 bg-stone-100 px-4 py-8 text-center print:px-2">
                 <MoonStars size={36} weight="fill" className="mx-auto text-[#151515]" aria-hidden="true" />
-                <div className="mt-3 text-lg font-black text-stone-900 print:text-base">晚餐</div>
-                <div className="mt-1 text-xs font-bold tracking-[0.2em] text-stone-600">DINNER</div>
+                <div className="admin-print-meal-heading mt-3 text-lg font-black text-stone-900">晚餐</div>
+                <div className="admin-print-meal-caption mt-1 text-xs font-bold tracking-[0.2em] text-stone-600">DINNER</div>
               </div>
               {weekDates.map((dateStr) => (
                 <MealSlot
@@ -597,7 +597,7 @@ function MealSlot({
     return (
       <div
         data-testid={`meal-slot-${date}-${mealType}`}
-        className="content-swap min-h-[220px] border-r border-t border-stone-300 bg-[#fffdf5] p-4 print:min-h-[180px] print:p-3"
+        className="admin-print-slot content-swap min-h-[220px] border-r border-t border-stone-300 bg-[#fffdf5] p-4 print:p-3"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-sm font-black tracking-[0.08em] text-stone-700">
@@ -614,7 +614,7 @@ function MealSlot({
           value={editValue}
           data-testid={`meal-editor-${date}-${mealType}`}
           onChange={(e) => onEditValueChange(e.target.value)}
-          className="ui-focus min-h-[110px] w-full rounded-xl border border-stone-300 bg-white p-3 text-sm font-bold leading-7 text-stone-800 focus:border-[#f5c518] focus:outline-none print:min-h-[90px] print:text-xs"
+          className="admin-print-editor ui-focus min-h-[110px] w-full rounded-xl border border-stone-300 bg-white p-3 text-sm font-bold leading-7 text-stone-800 focus:border-[#f5c518] focus:outline-none print:min-h-[90px]"
           rows={4}
           placeholder="输入菜品，如：红烧肉、清炒时蔬、番茄蛋汤"
         />
@@ -641,12 +641,12 @@ function MealSlot({
   return (
     <div
       data-testid={`meal-slot-${date}-${mealType}`}
-      className="group flex min-h-[220px] cursor-pointer flex-col justify-between border-r border-t border-stone-300 bg-white p-4 transition-colors hover:bg-[#fff9dc]/50 print:min-h-[180px] print:p-3"
+      className="admin-print-slot group flex min-h-[220px] cursor-pointer flex-col justify-between border-r border-t border-stone-300 bg-white p-4 transition-colors hover:bg-[#fff9dc]/50 print:p-3"
       onClick={onStartEdit}
     >
       <div className="flex-1">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="text-sm font-black tracking-[0.08em] text-stone-700">
+          <div className="admin-print-slot-label text-sm font-black tracking-[0.08em] text-stone-700">
             <span className="flex items-center gap-2">
               <MealIcon size={18} weight="fill" aria-hidden="true" />
               {label}
@@ -669,12 +669,12 @@ function MealSlot({
         {menu ? (
           <p
             data-testid={`meal-dishes-${date}-${mealType}`}
-            className="whitespace-pre-wrap text-[15px] leading-8 text-stone-700 print:text-xs print:leading-6"
+            className="admin-print-dishes whitespace-pre-wrap text-[15px] leading-8 text-stone-700"
           >
             {menu.dishes}
           </p>
         ) : (
-          <div className="flex h-full min-h-[96px] items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50 text-center text-sm font-bold text-stone-400 print:min-h-[80px] print:text-xs">
+          <div className="admin-print-empty flex h-full min-h-[96px] items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50 text-center text-sm font-bold text-stone-400 print:min-h-[80px]">
             点击添加菜单
           </div>
         )}

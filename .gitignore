@@ -16,6 +16,7 @@
 /.playwright-cli/
 /test-results
 /playwright/.auth
+/tmp/
 
 # next.js
 /.next/

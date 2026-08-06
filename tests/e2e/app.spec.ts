@@ -437,6 +437,67 @@ test("admin page requires password before menu management is shown", async ({ pa
   await expect(page.getByTestId("admin-password-submit")).toBeVisible();
 });
 
+test("admin print view uses readable A4 landscape typography", async ({ page }) => {
+  test.skip(!adminPassword, "ADMIN_PASSWORD is required for admin e2e coverage.");
+
+  await login(page);
+  const targetDate = getChinaWeekStart();
+  const originalMenu = (await getWeekMenus(page, targetDate)).find(
+    (item) => item.date === targetDate && item.mealType === "lunch"
+  );
+
+  try {
+    await verifyAdmin(page);
+    await setAdminMenuByApi(page, targetDate, "lunch", "红烧排骨、清炒时蔬、番茄蛋汤");
+    await page.reload();
+    await expect(page.getByTestId(`meal-dishes-${targetDate}-lunch`)).toBeVisible();
+    await page.emulateMedia({ media: "print" });
+
+    const printMetrics = await page.evaluate(() => {
+      const getSize = (selector: string) => {
+        const element = document.querySelector<HTMLElement>(selector);
+        return element ? Number.parseFloat(getComputedStyle(element).fontSize) : 0;
+      };
+      const findPageSize = (rules: CSSRuleList): string => {
+        for (const rule of Array.from(rules)) {
+          if (rule instanceof CSSPageRule) return rule.style.getPropertyValue("size");
+          if ("cssRules" in rule) {
+            const nestedSize = findPageSize((rule as CSSGroupingRule).cssRules);
+            if (nestedSize) return nestedSize;
+          }
+        }
+        return "";
+      };
+
+      return {
+        dishes: getSize(".admin-print-dishes"),
+        date: getSize(".admin-print-date"),
+        mealHeading: getSize(".admin-print-meal-heading"),
+        pageAnimation: getComputedStyle(
+          document.querySelector<HTMLElement>(".admin-print-main")!
+        ).animationName,
+        pageOpacity: getComputedStyle(
+          document.querySelector<HTMLElement>(".admin-print-main")!
+        ).opacity,
+        pageSize: Array.from(document.styleSheets)
+          .map((sheet) => findPageSize(sheet.cssRules))
+          .find(Boolean) ?? "",
+      };
+    });
+
+    expect(printMetrics.dishes).toBeGreaterThanOrEqual(18.5);
+    expect(printMetrics.date).toBeGreaterThanOrEqual(16);
+    expect(printMetrics.mealHeading).toBeGreaterThanOrEqual(21);
+    expect(printMetrics.pageAnimation).toBe("none");
+    expect(printMetrics.pageOpacity).toBe("1");
+    expect(printMetrics.pageSize.toLowerCase()).toContain("a4");
+    expect(printMetrics.pageSize.toLowerCase()).toContain("landscape");
+  } finally {
+    await verifyAdmin(page);
+    await setAdminMenuByApi(page, targetDate, "lunch", originalMenu?.dishes ?? null);
+  }
+});
+
 test("admin can save a menu and the saved value survives reload", async ({ page }) => {
   test.skip(!adminPassword, "ADMIN_PASSWORD is required for admin e2e coverage.");
 
