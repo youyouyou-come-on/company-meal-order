@@ -448,7 +448,7 @@ test("admin print view uses readable A4 landscape typography", async ({ page }) 
 
   try {
     await verifyAdmin(page);
-    await setAdminMenuByApi(page, targetDate, "lunch", "红烧排骨、清炒时蔬、番茄蛋汤");
+    await setAdminMenuByApi(page, targetDate, "lunch", "肉末茄子 红烧牛腩\t凉拌黄瓜");
     await page.reload();
     await expect(page.getByTestId(`meal-dishes-${targetDate}-lunch`)).toBeVisible();
     await page.emulateMedia({ media: "print" });
@@ -494,7 +494,7 @@ test("admin print view uses readable A4 landscape typography", async ({ page }) 
     expect(printMetrics.dishes).toBeGreaterThanOrEqual(26.5);
     expect(printMetrics.date).toBeGreaterThanOrEqual(18.5);
     expect(printMetrics.mealHeading).toBeGreaterThanOrEqual(25);
-    expect(printMetrics.dishLines).toEqual(["红烧排骨", "清炒时蔬", "番茄蛋汤"]);
+    expect(printMetrics.dishLines).toEqual(["肉末茄子", "红烧牛腩", "凉拌黄瓜"]);
     expect(printMetrics.pageAnimation).toBe("none");
     expect(printMetrics.pageOpacity).toBe("1");
     expect(printMetrics.pageSize.toLowerCase()).toContain("a4");

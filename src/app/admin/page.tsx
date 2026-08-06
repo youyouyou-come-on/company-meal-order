@@ -58,7 +58,7 @@ function getWeekDates(monday: string): string[] {
 
 function formatPrintDishes(dishes: string) {
   return dishes
-    .split(/[、，,；;\n]+/)
+    .split(/[、，,；;\s]+/)
     .map((dish) => dish.trim())
     .filter(Boolean)
     .join("\n");
