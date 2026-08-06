@@ -255,7 +255,7 @@ a {
   }
 
   .admin-print-grid {
-    grid-template-columns: 28mm repeat(6, minmax(0, 1fr));
+    grid-template-columns: 24mm repeat(6, minmax(0, 1fr));
   }
 
   .admin-print-corner {
@@ -294,7 +294,7 @@ a {
 
   .admin-print-slot {
     min-height: 46mm;
-    padding: 3mm;
+    padding: 3mm 1.5mm;
     break-inside: avoid;
   }
 
@@ -308,11 +308,37 @@ a {
     display: none;
   }
 
-  .admin-print-dishes,
+  .admin-print-dishes {
+    font-size: 20pt;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
   .admin-print-editor {
     font-size: 20pt;
     font-weight: 700;
     line-height: 1.35;
+  }
+
+  .admin-print-dish-item {
+    display: block;
+    white-space: nowrap;
+  }
+
+  .admin-print-dish-medium {
+    font-size: 18pt;
+  }
+
+  .admin-print-dish-long {
+    font-size: 16pt;
+  }
+
+  .admin-print-dish-extra-long {
+    font-size: 14pt;
+  }
+
+  .admin-print-dish-very-long {
+    font-size: 12pt;
   }
 
   .admin-print-empty {

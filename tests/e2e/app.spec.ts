@@ -448,7 +448,7 @@ test("admin print view uses readable A4 landscape typography", async ({ page }) 
 
   try {
     await verifyAdmin(page);
-    await setAdminMenuByApi(page, targetDate, "lunch", "肉末茄子 红烧牛腩\t凉拌黄瓜");
+    await setAdminMenuByApi(page, targetDate, "lunch", "肉末茄子 杏鲍菇丝炒木耳\t凉拌腐竹木耳");
     await page.reload();
     await expect(page.getByTestId(`meal-dishes-${targetDate}-lunch`)).toBeVisible();
     await page.emulateMedia({ media: "print" });
@@ -473,12 +473,15 @@ test("admin print view uses readable A4 landscape typography", async ({ page }) 
         dishes: getSize(".admin-print-dishes"),
         date: getSize(".admin-print-date"),
         mealHeading: getSize(".admin-print-meal-heading"),
-        dishLines:
-          document
-            .querySelector<HTMLElement>(".admin-print-dishes")
-            ?.textContent?.split("\n")
-            .map((dish) => dish.trim())
-            .filter(Boolean) ?? [],
+        dishItems: Array.from(
+          document.querySelectorAll<HTMLElement>("[data-print-dish-item]")
+        )
+          .slice(0, 3)
+          .map((dish) => ({
+            text: dish.textContent?.trim() ?? "",
+            fontSize: Number.parseFloat(getComputedStyle(dish).fontSize),
+            fitsOneLine: dish.scrollWidth <= dish.clientWidth + 1,
+          })),
         pageAnimation: getComputedStyle(
           document.querySelector<HTMLElement>(".admin-print-main")!
         ).animationName,
@@ -494,7 +497,11 @@ test("admin print view uses readable A4 landscape typography", async ({ page }) 
     expect(printMetrics.dishes).toBeGreaterThanOrEqual(26.5);
     expect(printMetrics.date).toBeGreaterThanOrEqual(18.5);
     expect(printMetrics.mealHeading).toBeGreaterThanOrEqual(25);
-    expect(printMetrics.dishLines).toEqual(["肉末茄子", "红烧牛腩", "凉拌黄瓜"]);
+    expect(printMetrics.dishItems).toEqual([
+      { text: "肉末茄子", fontSize: expect.closeTo(26.67, 1), fitsOneLine: true },
+      { text: "杏鲍菇丝炒木耳", fontSize: expect.closeTo(21.33, 1), fitsOneLine: true },
+      { text: "凉拌腐竹木耳", fontSize: expect.closeTo(24, 1), fitsOneLine: true },
+    ]);
     expect(printMetrics.pageAnimation).toBe("none");
     expect(printMetrics.pageOpacity).toBe("1");
     expect(printMetrics.pageSize.toLowerCase()).toContain("a4");

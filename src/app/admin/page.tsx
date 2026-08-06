@@ -56,12 +56,20 @@ function getWeekDates(monday: string): string[] {
   return getChinaWeekDates(0, 6, businessDateToUtcDate(monday));
 }
 
-function formatPrintDishes(dishes: string) {
+function splitPrintDishes(dishes: string) {
   return dishes
     .split(/[、，,；;\s]+/)
     .map((dish) => dish.trim())
-    .filter(Boolean)
-    .join("\n");
+    .filter(Boolean);
+}
+
+function getPrintDishSizeClass(dish: string) {
+  const length = Array.from(dish).length;
+  if (length >= 9) return "admin-print-dish-very-long";
+  if (length >= 8) return "admin-print-dish-extra-long";
+  if (length >= 7) return "admin-print-dish-long";
+  if (length >= 6) return "admin-print-dish-medium";
+  return "";
 }
 
 export default function AdminPage() {
@@ -684,9 +692,17 @@ function MealSlot({
             </p>
             <p
               data-testid={`meal-print-dishes-${date}-${mealType}`}
-              className="admin-print-dishes hidden whitespace-pre-line text-stone-900 print:block"
+              className="admin-print-dishes hidden text-stone-900 print:block"
             >
-              {formatPrintDishes(menu.dishes)}
+              {splitPrintDishes(menu.dishes).map((dish) => (
+                <span
+                  key={dish}
+                  data-print-dish-item="true"
+                  className={`admin-print-dish-item ${getPrintDishSizeClass(dish)}`}
+                >
+                  {dish}
+                </span>
+              ))}
             </p>
           </>
         ) : (
