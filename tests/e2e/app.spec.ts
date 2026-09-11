@@ -4,11 +4,13 @@ import { strFromU8, unzipSync } from "fflate";
 import {
   addBusinessDays,
   formatMenuExportFilename,
+  getBusinessWeekRange,
   getBusinessDateWeekday,
   getChinaWeekDates,
   getChinaWeekStart,
   getChinaTodayString,
   getOrderableDates,
+  isMealOrderableDate,
 } from "../../src/lib/china-date";
 import { createMenuWorkbook } from "../../src/lib/menu-excel";
 
@@ -186,6 +188,50 @@ async function ensureMealQuantity(
 }
 
 test.describe.configure({ mode: "serial" });
+
+test("special Sunday workday participates in menu display and ordering dates", async () => {
+  const saturdayBeforeMakeupDay = new Date("2026-09-19T01:00:00.000Z");
+  const makeupSunday = new Date("2026-09-20T01:00:00.000Z");
+  const regularSunday = new Date("2026-09-27T01:00:00.000Z");
+  const makeupWeekDates = getChinaWeekDates(0, 6, new Date("2026-09-14T01:00:00.000Z"));
+  const regularWeekDates = getChinaWeekDates(0, 6, new Date("2026-09-21T01:00:00.000Z"));
+  const makeupWeekRange = getBusinessWeekRange("2026-09-14");
+
+  expect(getOrderableDates(saturdayBeforeMakeupDay)).toEqual(["2026-09-19", "2026-09-20"]);
+  expect(getOrderableDates(makeupSunday)).toEqual(["2026-09-20", "2026-09-21"]);
+  expect(getOrderableDates(regularSunday)).toEqual(["2026-09-28"]);
+  expect(isMealOrderableDate("2026-09-20", saturdayBeforeMakeupDay)).toBe(true);
+  expect(isMealOrderableDate("2026-09-20", makeupSunday)).toBe(true);
+  expect(isMealOrderableDate("2026-09-27", regularSunday)).toBe(false);
+  expect(makeupWeekDates).toEqual([
+    "2026-09-14",
+    "2026-09-15",
+    "2026-09-16",
+    "2026-09-17",
+    "2026-09-18",
+    "2026-09-19",
+    "2026-09-20",
+  ]);
+  expect(regularWeekDates).toHaveLength(6);
+  expect(makeupWeekRange.end.toISOString()).toBe("2026-09-20T00:00:00.000Z");
+});
+
+test("special Sunday workday is visible in its weekly menu", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-09-11T01:00:00.000Z"));
+  await login(page, e2eUserName);
+  await page.getByRole("button", { name: "下周点餐" }).click();
+  await expect(page.getByTestId("home-day-tab-2026-09-20")).toBeVisible();
+  await expect(page.getByTestId("home-day-tab-2026-09-20")).toContainText("周日");
+
+  await verifyAdmin(page);
+  await page.getByRole("button", { name: "下一周 →" }).click();
+  await expect(page.getByTestId("admin-day-2026-09-20")).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByTestId("admin-menu-export").click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("2026.09.14-2026.09.20.xlsx");
+});
 
 test("user can login and view current meal cards", async ({ page }) => {
   await login(page, e2eUserName);
@@ -566,14 +612,14 @@ test("admin can export a dated Excel file and atomically import menus across fut
   try {
     await verifyAdmin(page);
 
+    const currentWeekEnd = getBusinessWeekRange(currentWeekStart).end.toISOString().slice(0, 10);
+    const nextWeekEnd = getBusinessWeekRange(nextWeekStart).end.toISOString().slice(0, 10);
+
     const downloadPromise = page.waitForEvent("download");
     await page.getByTestId("admin-menu-export").click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe(
-      formatMenuExportFilename(
-        currentWeekStart,
-        addBusinessDays(currentWeekStart, 5)
-      )
+      formatMenuExportFilename(currentWeekStart, currentWeekEnd)
     );
     const downloadPath = await download.path();
     expect(downloadPath).not.toBeNull();
@@ -581,7 +627,6 @@ test("admin can export a dated Excel file and atomically import menus across fut
     const exportedFiles = unzipSync(exportedFile);
     const workbookXml = strFromU8(exportedFiles["xl/workbook.xml"]);
     const worksheetXml = strFromU8(exportedFiles["xl/worksheets/sheet1.xml"]);
-    const currentWeekEnd = addBusinessDays(currentWeekStart, 5);
     const compactDate = (date: string, separator: string) =>
       date.split("-").map(Number).join(separator);
     const title = `${compactDate(currentWeekStart, ".")}-${compactDate(currentWeekEnd, ".")}一周菜单`;
@@ -601,7 +646,7 @@ test("admin can export a dated Excel file and atomically import menus across fut
     await page.getByTestId("admin-menu-export").click();
     const nextWeekDownload = await nextWeekDownloadPromise;
     expect(nextWeekDownload.suggestedFilename()).toBe(
-      formatMenuExportFilename(nextWeekStart, addBusinessDays(nextWeekStart, 5))
+      formatMenuExportFilename(nextWeekStart, nextWeekEnd)
     );
     await page.getByRole("button", { name: "回到本周" }).click();
 

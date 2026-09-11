@@ -4,6 +4,9 @@ export type MealType = "lunch" | "dinner";
 
 export const DAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
+// 周日补班需要同时出现在菜单中，并参与“下一个可点餐日”的计算。
+const SPECIAL_WORKDAYS = new Set(["2026-09-20"]);
+
 const CHINA_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: CHINA_TIME_ZONE,
   year: "numeric",
@@ -75,14 +78,26 @@ export function getBusinessWeekStart(dateStr: string, weekOffset = 0) {
   return addBusinessDays(today, diffToMonday + weekOffset * 7);
 }
 
+export function getBusinessWeekDates(weekStart: string, days = 6) {
+  const dates = Array.from({ length: days }, (_, index) => addBusinessDays(weekStart, index));
+  const sunday = addBusinessDays(weekStart, 6);
+
+  if (days === 6 && SPECIAL_WORKDAYS.has(sunday)) {
+    dates.push(sunday);
+  }
+
+  return dates;
+}
+
 export function getChinaWeekDates(weekOffset = 0, days = 6, date = new Date()) {
   const monday = getChinaWeekStart(date, weekOffset);
-  return Array.from({ length: days }, (_, index) => addBusinessDays(monday, index));
+  return getBusinessWeekDates(monday, days);
 }
 
 export function getBusinessWeekRange(weekStart?: string, days = 6) {
   const startDate = weekStart || getChinaWeekStart();
-  const endDate = addBusinessDays(startDate, days - 1);
+  const weekDates = getBusinessWeekDates(startDate, days);
+  const endDate = weekDates.at(-1) ?? startDate;
 
   return {
     start: businessDateToUtcDate(startDate),
@@ -104,14 +119,20 @@ export function formatMenuExportFilename(weekStart: string, weekEnd: string) {
 
 export function getOrderableDates(date = new Date()) {
   const today = getChinaTodayString(date);
-  const weekday = getBusinessDateWeekday(today);
+  const isOrderableWorkday = (dateStr: string) =>
+    getBusinessDateWeekday(dateStr) !== 0 || SPECIAL_WORKDAYS.has(dateStr);
+  const targetDateCount = isOrderableWorkday(today) ? 2 : 1;
+  const dates: string[] = [];
+  let candidate = today;
 
-  if (weekday === 0) {
-    return [addBusinessDays(today, 1)];
+  while (dates.length < targetDateCount) {
+    if (isOrderableWorkday(candidate)) {
+      dates.push(candidate);
+    }
+    candidate = addBusinessDays(candidate, 1);
   }
 
-  const nextOrderableDate = weekday === 6 ? addBusinessDays(today, 2) : addBusinessDays(today, 1);
-  return [today, nextOrderableDate];
+  return dates;
 }
 
 export function isMealOrderableDate(dateStr: string, now = new Date()) {

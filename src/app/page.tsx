@@ -347,7 +347,11 @@ export default function Home() {
         </div>
 
         <div className="mb-4 overflow-hidden border-y border-stone-300 bg-white sm:rounded-2xl sm:border">
-          <div className="grid grid-cols-6 divide-x divide-stone-200">
+          <div
+            className={`grid divide-x divide-stone-200 ${
+              weekDates.length === 7 ? "grid-cols-7" : "grid-cols-6"
+            }`}
+          >
             {weekDates.map((date) => {
               const { dayLabel, shortDate } = formatDateLabel(date);
               const isToday = date === today;

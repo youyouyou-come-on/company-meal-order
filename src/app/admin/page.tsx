@@ -99,8 +99,8 @@ function AdminMenuContent() {
 
   const monday = getMondayDate(weekOffset);
   const weekDates = getWeekDates(monday);
-  const saturdayDate = weekDates[5];
-  const weekLabel = `${weekDates[0]} ~ ${saturdayDate}`;
+  const weekEndDate = weekDates.at(-1) ?? weekDates[0];
+  const weekLabel = `${weekDates[0]} ~ ${weekEndDate}`;
 
   function handleDatePick(dateStr: string) {
     const pickedDay = getBusinessDateWeekday(dateStr);
@@ -229,6 +229,7 @@ function AdminMenuContent() {
         const dayIndex = lastWeekDates.indexOf(m.date);
         if (dayIndex === -1) continue;
         const newDate = weekDates[dayIndex];
+        if (!newDate) continue;
         await fetch("/api/admin/menus", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -287,7 +288,7 @@ function AdminMenuContent() {
               <p className="mt-5 text-xs font-black tracking-[0.24em] text-[#f5c518]">MENU BOARD</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight">管理菜单</h1>
               <p className="mt-2 text-sm font-bold text-stone-400">
-                一页看完周一到周六，截图、打印、发给阿姨都会更清楚。
+                一页看完当周菜单，截图、打印、发给阿姨都会更清楚。
               </p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-4 text-left lg:text-right">
@@ -371,7 +372,7 @@ function AdminMenuContent() {
               </button>
               <a
                 href={`/api/admin/menus/export?weekStart=${encodeURIComponent(monday)}`}
-                download={formatMenuExportFilename(monday, saturdayDate)}
+                download={formatMenuExportFilename(monday, weekEndDate)}
                 data-testid="admin-menu-export"
                 className="outline-button ui-press ui-focus flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-black"
               >
@@ -448,7 +449,11 @@ function AdminMenuContent() {
           <div className="overflow-x-auto rounded-2xl border border-stone-300 bg-white shadow-[0_16px_40px_rgba(21,21,21,0.1)] print:overflow-visible print:rounded-[24px] print:border-stone-400 print:shadow-none">
             <div
               data-testid="admin-week-grid"
-              className="admin-print-grid grid min-w-[1180px] grid-cols-[132px_repeat(6,minmax(174px,1fr))] print:min-w-0"
+              className={`admin-print-grid grid print:min-w-0 ${
+                weekDates.length === 7
+                  ? "admin-print-grid-seven-days min-w-[1354px] grid-cols-[132px_repeat(7,minmax(174px,1fr))]"
+                  : "min-w-[1180px] grid-cols-[132px_repeat(6,minmax(174px,1fr))]"
+              }`}
             >
               <div className="admin-print-corner border-b border-r border-stone-300 bg-[#151515] px-4 py-5 text-center text-sm font-black tracking-[0.16em] text-white print:px-2 print:py-4">
                 餐次

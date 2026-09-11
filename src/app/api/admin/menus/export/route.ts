@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import {
-  addBusinessDays,
   formatBusinessDate,
   formatMenuExportFilename,
+  getBusinessWeekDates,
   getBusinessWeekRange,
   getChinaWeekStart,
 } from "@/lib/china-date";
@@ -43,9 +43,8 @@ export async function GET(request: NextRequest) {
       menuBySlot.set(`${date}-${menu.mealType}`, menu.dishes);
     }
 
-    const rows = Array.from({ length: 6 }, (_, dayIndex) =>
-      addBusinessDays(weekStart, dayIndex)
-    ).flatMap((date) =>
+    const weekDates = getBusinessWeekDates(weekStart);
+    const rows = weekDates.flatMap((date) =>
       (["lunch", "dinner"] as CsvMealType[]).map((mealType) => ({
         date,
         mealType,
@@ -53,10 +52,7 @@ export async function GET(request: NextRequest) {
       }))
     );
     const workbook = await createMenuWorkbook(rows);
-    const filename = formatMenuExportFilename(
-      weekStart,
-      addBusinessDays(weekStart, 5)
-    );
+    const filename = formatMenuExportFilename(weekStart, weekDates.at(-1) ?? weekStart);
 
     return new NextResponse(workbook, {
       status: 200,

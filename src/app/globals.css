@@ -258,6 +258,10 @@ a {
     grid-template-columns: 24mm repeat(6, minmax(0, 1fr));
   }
 
+  .admin-print-grid-seven-days {
+    grid-template-columns: 22mm repeat(7, minmax(0, 1fr));
+  }
+
   .admin-print-corner {
     padding: 3.5mm 2mm;
     font-size: 14pt;
